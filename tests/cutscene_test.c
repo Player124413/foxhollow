@@ -17,6 +17,8 @@ int main(void) {
   for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
     slot = invalid[i];
     assert(!fhCanSkipCutscene() && !fhSkipCutscene());
+    assert(!fhSequenceSkipRequested(slot, 123));
+    fhForgetSequenceSkip(slot);
   }
   slot = 7;
   gObjSeqSlotSeqIdTable[slot] = 0;
@@ -27,6 +29,21 @@ int main(void) {
   assert(fhCanSkipCutscene() && fhSkipCutscene());
   assert(!fhCanSkipCutscene() && !fhSkipCutscene());
   for (int i = 0; i < 0x58; ++i) assert(gObjSeqSlotResults[i] == (i == slot ? 2 : 0));
+  for (int frame = 0; frame < 10; ++frame) {
+    gObjSeqSlotResults[slot] = 0;
+    gObjSeqSlotPrevResults[slot] = 0;
+    assert(fhSequenceSkipRequested(slot, 123));
+    assert(!fhCanSkipCutscene());
+    assert(!fhSequenceSkipRequested(slot + 1, 123));
+    assert(!fhSequenceSkipRequested(slot, 124));
+  }
+  gObjSeqSlotSeqIdTable[slot] = 124;
+  assert(!fhSequenceSkipRequested(slot, 123));
+  fhForgetSequenceSkip(slot);
+  gObjSeqSlotSeqIdTable[slot] = 123;
+  assert(!fhSequenceSkipRequested(slot, 123));
+  assert(fhSkipCutscene());
+  fhForgetSequenceSkip(slot);
   gObjSeqSlotResults[slot] = 0;
   gObjSeqSlotPrevResults[slot] = 2;
   assert(!fhSkipCutscene());

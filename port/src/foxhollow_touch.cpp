@@ -17,7 +17,6 @@ namespace {
 auto controls = fh::touch::defaults;
 bool editing = false;
 bool menuOpen = false;
-bool skipPrompt = false;
 bool quitPrompt = false;
 int selected = 0;
 std::array<float, 4> hudBounds{};
@@ -88,7 +87,7 @@ extern "C" void fhTouchInit(const char* userPath) {
 extern "C" void fhTouchUpdate(void) {
   PADStatus status{};
   auto* window = SDL_GetKeyboardFocus();
-  if (!window || editing || menuOpen || skipPrompt || quitPrompt || !enabled) {
+  if (!window || editing || menuOpen || quitPrompt || !enabled) {
     contactCount = 0;
     releaseGuard = true;
     PADClearVirtualStatus(0);
@@ -219,16 +218,13 @@ constexpr ImGuiWindowFlags panelFlags = ImGuiWindowFlags_NoDecoration | ImGuiWin
                                        ImGuiWindowFlags_NoMove;
 }
 
-extern "C" int fhTouchMenuOpen(void) { return menuOpen || editing || skipPrompt || quitPrompt; }
+extern "C" int fhTouchMenuOpen(void) { return menuOpen || editing || quitPrompt; }
 
 extern "C" void fhTouchHandleEvent(const SDL_Event* event) {
   if (!event || event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
       (event->key.key != SDLK_ESCAPE && event->key.key != SDLK_AC_BACK)) return;
   if (quitPrompt) {
     quitPrompt = false;
-    release();
-  } else if (skipPrompt) {
-    skipPrompt = false;
     release();
   } else if (editing) {
     editing = false;
@@ -277,8 +273,7 @@ extern "C" void fhTouchDraw(void) {
     if (fhCanSkipCutscene()) {
       ImGui::SameLine();
       if (ImGui::Button("Skip scene", ImVec2(148 * scale, 44 * scale))) {
-        skipPrompt = true;
-        release();
+        if (fhSkipCutscene()) release();
       }
     }
     const auto pos = ImGui::GetWindowPos();
@@ -374,27 +369,6 @@ extern "C" void fhTouchDraw(void) {
     ImGui::EndChild();
     footer(scale);
     ImGui::End();
-  }
-  if (skipPrompt && !ImGui::IsPopupOpen("Skip scene?")) ImGui::OpenPopup("Skip scene?");
-  ImGui::SetNextWindowPos(ImVec2(size.x / 2, size.y / 2), ImGuiCond_Always, ImVec2(.5f, .5f));
-  ImGui::SetNextWindowSize(ImVec2(std::min(360 * scale, size.x * .94f), 0));
-  if (ImGui::BeginPopupModal("Skip scene?", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize)) {
-    if (!skipPrompt) ImGui::CloseCurrentPopup();
-    ImGui::TextUnformatted("Skip scene?");
-    float width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2;
-    if (ImGui::Button("Skip", ImVec2(width, 48 * scale))) {
-      fhSkipCutscene();
-      skipPrompt = false;
-      release();
-      ImGui::CloseCurrentPopup();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Back", ImVec2(width, 48 * scale))) {
-      skipPrompt = false;
-      release();
-      ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndPopup();
   }
   if (quitPrompt && !ImGui::IsPopupOpen("Return to launcher?")) ImGui::OpenPopup("Return to launcher?");
   ImGui::SetNextWindowPos(ImVec2(size.x / 2, size.y / 2), ImGuiCond_Always, ImVec2(.5f, .5f));

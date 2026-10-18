@@ -1,3 +1,6 @@
+#if defined(TARGET_PC)
+#include "foxhollow_cutscene.h"
+#endif
 #include "dlls/object_descriptor.h"
 #include "main/camera_interface.h"
 #include "main/dll/dll_0000_gameui.h"
@@ -19,6 +22,7 @@
 #include "main/obj_list.h"
 #include "main/obj_query.h"
 #include "main/objseq.h"
+#include "main/objseq_skip.h"
 #include "util/carry.h"
 #include "main/mm.h"
 #include "main/frame_timing.h"
@@ -541,6 +545,9 @@ void endObjSequence(int seq)
     }
     gObjSeqStartObjOverride = 0;
     gObjSeqSlotSeqIdTable[seq] = 0;
+#if defined(TARGET_PC)
+    fhForgetSequenceSkip(seq);
+#endif
 }
 
 f32 gObjSeqCameraFov = 60.0f;
@@ -1028,6 +1035,9 @@ int ObjSeq_start(int seqIdx, GameObject* obj, int flags)
     val = seqIdx + 1;
     slotPtr = &gObjSeqSlotSeqIdTable[slot];
     *slotPtr = val;
+#if defined(TARGET_PC)
+    fhForgetSequenceSkip(slot);
+#endif
     gObjSeqTaskTextId = -1;
     gObjSeqSubtitleId = -1;
 
@@ -5259,6 +5269,13 @@ int ObjSeq_update(GameObject* obj, f32 t)
         }
 
         slot = state->slot;
+#if defined(TARGET_PC)
+        if (fhSequenceSkipRequested(slot, gObjSeqSlotSeqIdTable[slot]))
+        {
+            gObjSeqSlotPrevResults[slot] = 2;
+            gObjSeqSlotPendingFrames[slot] = 0;
+        }
+#endif
         if (gObjSeqSlotPrevResults[slot] != 0 && (rewindStep = gObjSeqSlotPendingFrames[slot]) != 0)
         {
             state->curFrame -= rewindStep;
@@ -5314,8 +5331,7 @@ int ObjSeq_update(GameObject* obj, f32 t)
         }
         else if ((s8)gObjSeqSlotPrevResults[state->slot] == 2)
         {
-            state->curFrame = state->endFrame;
-            state->pendingConditionId = 0;
+            ObjSeq_skipPlayback(state);
             gObjSeqSkippingToEnd = 1;
         }
         else if ((s8)gObjSeqSlotPrevResults[state->slot] == 3)
@@ -5354,7 +5370,10 @@ int ObjSeq_update(GameObject* obj, f32 t)
             }
         }
 
-        state->curFrame = (s16)(state->curFrame + step);
+        if (gObjSeqSkippingToEnd == 0)
+        {
+            state->curFrame = (s16)(state->curFrame + step);
+        }
         if (state->curFrame > state->endFrame)
         {
             state->curFrame = state->endFrame;
@@ -5537,6 +5556,10 @@ int ObjSeq_update(GameObject* obj, f32 t)
             objCallSeqFn(activeObj, obj, seq, gObjSeqSlotPrevResults[state->slot]);
         }
 
+        if (gObjSeqSkippingToEnd != 0)
+        {
+            state->sequenceControlFlags &= ~OBJSEQ_CONTROL_RESTART_AT_SAVED_FRAME;
+        }
         if (state->sequenceControlFlags != 0)
         {
             restart = 0;
@@ -5594,6 +5617,10 @@ int ObjSeq_update(GameObject* obj, f32 t)
             gObjSeqStreamStopped = ObjSeq_StartPreparedStream(gObjSeqPreparingStreamSlot) == 0;
         }
         state->prevFrame = state->curFrame;
+        if (ObjSeq_skipComplete(state, gObjSeqSkippingToEnd))
+        {
+            gObjSeqStop = 1;
+        }
 
         if ((s8)gObjSeqStop != 0)
         {
@@ -5752,6 +5779,9 @@ void ObjSeq_onMapSetup(void)
         gObjSeqCondFlags[i] = 0;
         gObjSeqBoolFlags[i] = 0;
         gObjSeqSlotSeqIdTable[i] = 0;
+#if defined(TARGET_PC)
+        fhForgetSequenceSkip(i);
+#endif
         gObjSeqSlotPrevResults[i] = 0;
         gObjSeqSlotResults[i] = 0;
         gObjSeqSlotStates[i] = 0;

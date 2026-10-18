@@ -200,9 +200,8 @@ int main(int argc, char**) {
   currentSlot = 7;
   gObjSeqSlotSeqIdTable[7] = 123;
   frame(); frame();
-  click("Skip scene"); assert(fhTouchMenuOpen());
-  click("Back"); assert(!fhTouchMenuOpen() && !gObjSeqSlotResults[7]);
-  click("Skip scene"); click("Skip");
+  click("Skip scene");
+  assert(fhSequenceSkipRequested(7, 123));
   assert(!fhTouchMenuOpen() && gObjSeqSlotResults[7] == 2);
   frame(); assert(!items.contains("Skip scene"));
   currentSlot = 0;
