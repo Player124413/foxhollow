@@ -309,6 +309,12 @@ const char* platform_directory() {
 #else
   return "windows-amd64";
 #endif
+#elif defined(__ANDROID__)
+#if defined(__aarch64__)
+  return "android-arm64";
+#else
+  return "android-amd64";
+#endif
 #elif defined(__APPLE__)
 #if defined(__aarch64__)
   return "macos-arm64";

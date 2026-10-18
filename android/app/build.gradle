@@ -1,0 +1,30 @@
+plugins {
+    id 'com.android.application'
+}
+def repo = rootProject.projectDir.parentFile
+def borealis = new File(repo, 'extern/borealis')
+ext.borealisAndroid = [
+    borealisDir: borealis,
+    propertiesFile: new File(project.findProperty('nativeBuildDir') ?: new File(repo, 'build-android-arm64').path,
+                             'borealis-android.properties'),
+    namespace: 'dev.foxhollow',
+    applicationId: 'dev.foxhollow',
+    compileSdk: 35,
+    targetSdk: 35,
+    minSdk: 28
+]
+apply from: new File(borealis, 'platforms/android/gradle/borealis-application.gradle')
+
+android {
+    defaultConfig { testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner" }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    lint { abortOnError true }
+}
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}

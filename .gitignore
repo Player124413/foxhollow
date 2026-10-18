@@ -9,3 +9,8 @@ compile_commands.json
 CMakeUserPresets.json
 *.log
 mods/*/lib/
+android/.gradle/
+android/**/build/
+android/local.properties
+android/.cxx/
+android/__pycache__/

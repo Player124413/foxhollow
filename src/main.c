@@ -7,11 +7,16 @@
 #include <dolphin/vi.h>
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_video.h>
+#include <SDL3/SDL_messagebox.h>
 
 #include "foxhollow_config.h"
 #include "foxhollow_crash.h"
 #include "foxhollow_mods.h"
 #include "foxhollow_splash.h"
+
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +24,11 @@
 
 int gameMain(int argc, char** argv);
 void foxhollowFramePumpInit(void);
+#if defined(__ANDROID__)
+void fhTouchInit(const char* userPath);
+void fhAndroidInit(void);
+int fhTouchConfigure(void);
+#endif
 
 typedef struct FoxhollowDiscMapping {
   char gameName[4];
@@ -50,6 +60,7 @@ static const FoxhollowDiscMapping* disc_mapping(const DVDDiskID* id) {
 }
 
 static void log_callback(AuroraLogLevel level, const char* module, const char* message, unsigned int len) {
+  (void)len;
   const char* levelStr;
   FILE* out = stdout;
   switch (level) {
@@ -71,6 +82,10 @@ static void log_callback(AuroraLogLevel level, const char* module, const char* m
     out = stderr;
     break;
   }
+#if defined(__ANDROID__)
+  const int priorities[] = {ANDROID_LOG_DEBUG, ANDROID_LOG_INFO, ANDROID_LOG_WARN, ANDROID_LOG_ERROR, ANDROID_LOG_FATAL};
+  __android_log_print(priorities[level], "Foxhollow", "%s: %s", module, message);
+#endif
   fprintf(out, "[%s] %s: %s\n", levelStr, module, message);
   if (level == LOG_FATAL) {
     fflush(out);
@@ -135,6 +150,10 @@ int main(int argc, char* argv[]) {
       .desiredBackend = fhConfigBackend(),
       .logCallback = &log_callback,
       .vsync = fhConfigVsync() != 0,
+#if defined(__ANDROID__)
+      .pauseOnFocusLost = true,
+      .maxTextureAnisotropy = 4,
+#endif
       .startFullscreen = fhConfigFullscreen() != 0,
       .allowTextureDumps = texture_dumps_enabled() != 0,
       .windowPosX = SDL_WINDOWPOS_CENTERED,
@@ -150,12 +169,18 @@ int main(int argc, char* argv[]) {
 
   if (!aurora_dvd_open(disc)) {
     fprintf(stderr, "foxhollow: failed to open disc image: %s\n", disc);
+#if defined(__ANDROID__)
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Foxhollow", "ISO / RVZ / WIA: DVDOpen failed", NULL);
+#endif
     aurora_shutdown();
     return 1;
   }
 
   mapping = disc_mapping(DVDGetCurrentDiskID());
   if (mapping == NULL) {
+#if defined(__ANDROID__)
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Foxhollow", "GSAE01 / GSAJ01 / GSAP01 required", NULL);
+#endif
     const DVDDiskID* id = DVDGetCurrentDiskID();
     fprintf(stderr, "foxhollow: unsupported disc %.4s%.2s revision %u, disc %u\n", id->gameName, id->company,
             id->gameVersion, id->diskNumber);
@@ -166,9 +191,17 @@ int main(int argc, char* argv[]) {
   fprintf(stdout, "foxhollow: using %s disc with the GSAE01 asset mapping and USA 1.%d code\n", mapping->label,
           revision);
 
+#if defined(__ANDROID__)
+  fhAndroidInit();
+  fhTouchInit(info.userPath);
+#endif
   fhModsInit(argc, argv, info.userPath);
 
-  if (!fhSplashRun()) {
+  if (
+#if defined(__ANDROID__)
+      !fhTouchConfigure() ||
+#endif
+      !fhSplashRun()) {
     fhModsShutdown();
     aurora_dvd_close();
     aurora_shutdown();

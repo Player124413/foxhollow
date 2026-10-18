@@ -24,6 +24,10 @@ void fhDebugOverlayFrameBegin(void);
 void fhDebugOverlayFramePresented(void);
 #endif
 void fhGalleryUpdate(void);
+#if defined(__ANDROID__)
+void fhTouchUpdate(void);
+void fhTouchDraw(void);
+#endif
 
 static VIRetraceCallback sPreRetraceCallback;
 static VIRetraceCallback sPostRetraceCallback;
@@ -60,7 +64,11 @@ static void wait_for_retrace_deadline(void) {
   const Uint64 deadline = sNextRetraceNs;
   sNextRetraceNs += periodNs;
   if (now < deadline) {
+#if defined(__ANDROID__)
+    SDL_DelayNS(deadline - now);
+#else
     SDL_DelayPrecise(deadline - now);
+#endif
   }
 }
 
@@ -82,6 +90,9 @@ static void pump_events(void) {
     }
     ++event;
   }
+#if defined(__ANDROID__)
+  fhTouchUpdate();
+#endif
   if (quitting) {
     shutdown_and_exit();
   }
@@ -97,6 +108,9 @@ void VIWaitForRetrace(void) {
 #if defined(FOXHOLLOW_DEBUG_SHORTCUTS)
     fhDebugOverlayDraw();
     fhGalleryDrawOverlay();
+#endif
+#if defined(__ANDROID__)
+    fhTouchDraw();
 #endif
     if (sBlack) {
       fhDrawBlackScreen();
@@ -114,6 +128,7 @@ void VIWaitForRetrace(void) {
   wait_for_retrace_deadline();
   pump_events();
   while (!aurora_begin_frame()) {
+    SDL_Delay(8);
     pump_events();
   }
   sFrameOpen = 1;

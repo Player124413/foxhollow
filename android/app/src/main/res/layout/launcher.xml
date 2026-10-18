@@ -1,0 +1,45 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/app_name" android:textSize="38sp" android:textStyle="bold" android:textColor="#FFFFFF" />
+        <TextView style="@style/Label" android:text="@string/subtitle" />
+        <TextView android:id="@+id/disc_status" style="@style/Label" android:accessibilityLiveRegion="polite" />
+        <Button android:id="@+id/play" android:layout_width="match_parent" android:layout_height="64dp"
+            android:layout_marginTop="20dp" android:text="@string/play" />
+        <Button android:id="@+id/import_disc" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/import_disc" />
+        <ProgressBar android:id="@+id/import_progress" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:indeterminate="true"
+            android:visibility="gone" />
+        <Button android:id="@+id/import_cancel" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/import_cancel" android:visibility="gone" />
+        <LinearLayout android:id="@+id/settings" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <TextView style="@style/Heading" android:text="@string/graphics" />
+            <TextView style="@style/Label" android:text="@string/renderer" android:labelFor="@id/renderer" />
+            <Spinner android:id="@+id/renderer" android:layout_width="match_parent" android:layout_height="48dp"
+                android:entries="@array/renderer_labels" />
+            <TextView style="@style/Label" android:text="@string/resolution" android:labelFor="@id/render_scale" />
+            <Spinner android:id="@+id/render_scale" android:layout_width="match_parent" android:layout_height="48dp"
+                android:entries="@array/scale_labels" />
+            <TextView style="@style/Label" android:text="@string/aspect" android:labelFor="@id/aspect" />
+            <Spinner android:id="@+id/aspect" android:layout_width="match_parent" android:layout_height="48dp"
+                android:entries="@array/aspect_labels" />
+            <Switch android:id="@+id/vsync" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/vsync" />
+            <Switch android:id="@+id/fps" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/fps" />
+            <TextView style="@style/Label" android:text="@string/performance_note" />
+            <TextView style="@style/Heading" android:text="@string/sound" />
+            <TextView android:id="@+id/volume_label" style="@style/Label" android:labelFor="@id/volume" />
+            <SeekBar android:id="@+id/volume" android:layout_width="match_parent" android:layout_height="48dp" android:max="100" />
+            <Switch android:id="@+id/touch" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/touch" />
+            <Switch android:id="@+id/touch_editor" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/touch_editor" />
+            <Switch android:id="@+id/keep_screen_on" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/keep_screen_on" />
+            <Button android:id="@+id/touch_reset" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/touch_reset" />
+            <Button android:id="@+id/cache_clear" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/cache_clear" />
+            <Button android:id="@+id/settings_reset" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_reset" />
+            <TextView style="@style/Label" android:text="@string/legal" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

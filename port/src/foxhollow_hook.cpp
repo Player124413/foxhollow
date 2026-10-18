@@ -10,6 +10,9 @@
 #include <psapi.h>
 #else
 #include <sys/mman.h>
+#if defined(__ANDROID__)
+#include <dlfcn.h>
+#endif
 #include <unistd.h>
 #endif
 
@@ -227,6 +230,20 @@ void* resolve_in_image(const std::string& decorated) {
     }
   }
   return nullptr;
+}
+
+#elif defined(__ANDROID__)
+
+void* resolve_in_image(const std::string& name) {
+  Dl_info image{};
+  if (!dladdr(reinterpret_cast<const void*>(&fhHookTargetIsPatchable), &image) || !image.dli_fname) {
+    return nullptr;
+  }
+  void* handle = dlopen(image.dli_fname, RTLD_NOW | RTLD_NOLOAD);
+  if (!handle) return nullptr;
+  void* symbol = dlsym(handle, name.c_str());
+  dlclose(handle);
+  return symbol;
 }
 
 #elif defined(__linux__)

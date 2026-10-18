@@ -22,6 +22,7 @@ int fhConfigFullscreen(void);
 int fhConfigVsync(void);
 int fhConfigFrameLimit(void);
 f32 fhConfigRenderScale(void);
+f32 fhConfigAudioGain(void);
 AuroraBackend fhConfigBackend(void);
 int fhConfigRevision(void);
 int fhConfigLanguage(void);

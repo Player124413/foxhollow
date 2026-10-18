@@ -1,5 +1,6 @@
 #include "foxhollow_config.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,6 +14,7 @@ static int sFullscreen;
 static int sVsync = 1;
 static int sFrameLimit = FH_DEFAULT_FRAME_LIMIT;
 static f32 sRenderScale;
+static f32 sAudioGain = 1.0f;
 static AuroraBackend sBackend = BACKEND_AUTO;
 static int sRevision;
 static int sLanguage = -1;
@@ -120,6 +122,15 @@ static void load(void) {
     }
   }
 
+  const char* audioGain = getenv("FOXHOLLOW_AUDIO_GAIN");
+  if (audioGain != NULL) {
+    char* end;
+    float gain = strtof(audioGain, &end);
+    if (end != audioGain && *end == '\0' && isfinite(gain) && gain >= 0.0f && gain <= 1.0f) {
+      sAudioGain = gain;
+    }
+  }
+
   sLanguage = parse_language(getenv("FOXHOLLOW_LANGUAGE"));
   sBackend = parse_backend(getenv("FOXHOLLOW_RENDERER"));
 
@@ -218,4 +229,9 @@ const char* fhConfigUserPath(void) {
 const char* fhConfigCachePath(void) {
   load();
   return sHasCachePath ? sCachePath : NULL;
+}
+
+f32 fhConfigAudioGain(void) {
+  load();
+  return sAudioGain;
 }

@@ -1,3 +1,4 @@
+#include "foxhollow_config.h"
 #include <dolphin/ai.h>
 #include <dolphin/dvd.h>
 #include <SDL3/SDL.h>
@@ -38,7 +39,7 @@ static s32 sStreamHistRight2;
 
 #if defined(FOXHOLLOW_DEBUG_SHORTCUTS)
 static void aiSetMuted(u32 muted) {
-  float gain = muted != 0 ? 0.0f : 1.0f;
+  float gain = muted != 0 ? 0.0f : fhConfigAudioGain();
 
   sMuted = muted;
   if (sOutputStream != NULL) {
@@ -80,11 +81,12 @@ static void aiOpenOutput(void) {
   if (sOutputStream == NULL) {
     fprintf(stderr, "[foxhollow] SDL audio output failed: %s\n", SDL_GetError());
   }
-#if defined(FOXHOLLOW_DEBUG_SHORTCUTS)
   else {
-    SDL_SetAudioStreamGain(sOutputStream, sMuted != 0 ? 0.0f : 1.0f);
-  }
+    SDL_SetAudioStreamGain(sOutputStream, fhConfigAudioGain());
+#if defined(FOXHOLLOW_DEBUG_SHORTCUTS)
+    if (sMuted) SDL_SetAudioStreamGain(sOutputStream, 0.0f);
 #endif
+  }
 }
 
 static void aiOpenStreamOutput(void) {
@@ -105,11 +107,12 @@ static void aiOpenStreamOutput(void) {
   if (sStreamOutput == NULL) {
     fprintf(stderr, "[foxhollow] SDL stream audio output failed: %s\n", SDL_GetError());
   }
-#if defined(FOXHOLLOW_DEBUG_SHORTCUTS)
   else {
-    SDL_SetAudioStreamGain(sStreamOutput, sMuted != 0 ? 0.0f : 1.0f);
-  }
+    SDL_SetAudioStreamGain(sStreamOutput, fhConfigAudioGain());
+#if defined(FOXHOLLOW_DEBUG_SHORTCUTS)
+    if (sMuted) SDL_SetAudioStreamGain(sStreamOutput, 0.0f);
 #endif
+  }
 }
 
 static s16 aiDecodeStreamSample(s32 bits, s32 predictorScale, s32* hist1, s32* hist2) {

@@ -1,0 +1,26 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#FF963C</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#10151F</item>
+        <item name="android:navigationBarColor">#10151F</item>
+        <item name="android:windowBackground">#10151F</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="Heading">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">#FF963C</item>
+        <item name="android:layout_marginTop">24dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+    </style>
+    <style name="Label">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">10dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">#CED6E3</item>
+    </style>
+</resources>
