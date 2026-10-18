@@ -29,6 +29,8 @@ std::string path;
 struct Contact { SDL_TouchID device; SDL_FingerID finger; int control; };
 std::array<Contact, 16> contacts;
 int contactCount = 0;
+std::array<ImVec2, 2> thumbTargets{};
+std::array<fh::touch::Thumb, 2> thumbs{};
 auto previousControls = controls;
 float previousOpacity = opacity, previousDeadzone = deadzone;
 void snapshot() {
@@ -86,6 +88,7 @@ extern "C" void fhTouchInit(const char* userPath) {
 
 extern "C" void fhTouchUpdate(void) {
   PADStatus status{};
+  thumbTargets = {};
   auto* window = SDL_GetKeyboardFocus();
   if (!window || editing || menuOpen || quitPrompt || !enabled) {
     contactCount = 0;
@@ -135,6 +138,8 @@ extern "C" void fhTouchUpdate(void) {
       if (selected < 0) continue;
       auto& c = controls[selected];
       if (selected < 2) {
+        if (!releaseGuard) thumbTargets[selected] = ImVec2((finger.x - c.x) * w / (c.radius * unit),
+                                                         (finger.y - c.y) * h / (c.radius * unit));
         auto axis = fh::touch::stick((finger.x - c.x) * w / (c.radius * unit),
                                     (finger.y - c.y) * h / (c.radius * unit), deadzone);
         if (selected == 0) { status.stickX = axis[0]; status.stickY = axis[1]; }
@@ -210,6 +215,19 @@ void drawControls(ImDrawList* draw, ImVec2 origin, ImVec2 size, bool preview) {
                                                           preview ? .8f : opacity)), 48);
     draw->AddCircle(center, r, highlight ? IM_COL32(90, 195, 255, 255) : IM_COL32(210, 225, 245, 180),
                     48, highlight ? 3.f : 1.f);
+    if (i < 2) {
+      auto& thumb = thumbs[i];
+      auto target = preview ? ImVec2() : thumbTargets[i];
+      thumb.follow(target.x, target.y, ImGui::GetIO().DeltaTime);
+      ImVec2 knob(center.x + thumb.x * r * .56f, center.y + thumb.y * r * .56f);
+      draw->AddCircle(center, r * .58f, IM_COL32(140, 175, 205, 100), 48, 1.f);
+      draw->AddCircleFilled(ImVec2(knob.x, knob.y + r * .05f), r * .38f,
+                            ImGui::GetColorU32(ImVec4(0, 0, 0, preview ? .5f : opacity)), 48);
+      draw->AddCircleFilled(knob, r * .36f,
+                            ImGui::GetColorU32(ImVec4(.24f, .48f, .67f, preview ? 1.f : std::min(1.f, opacity + .25f))), 48);
+      draw->AddCircle(knob, r * .36f, IM_COL32(195, 230, 255, 230), 48, 2.f);
+      center = knob;
+    }
     auto text = ImGui::CalcTextSize(c.label);
     draw->AddText(ImVec2(center.x - text.x / 2, center.y - text.y / 2), IM_COL32_WHITE, c.label);
   }

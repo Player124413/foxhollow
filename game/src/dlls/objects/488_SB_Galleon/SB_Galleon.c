@@ -14,6 +14,10 @@
 #include "main/frame_timing.h"
 #include "main/mapEventTypes.h"
 #include "main/objseq.h"
+#ifdef TARGET_PC
+#include "foxhollow_cutscene.h"
+extern s16 gObjSeqSlotSeqIdTable[];
+#endif
 #include "main/screen_transition.h"
 #include "main/gamebits.h"
 #include "main/gamebit_ids.h"
@@ -985,12 +989,22 @@ int SB_Galleon_SeqFn(GameObject* obj, int unused, ObjSeqState* animUpdate) {
             Music_Trigger(state->musicIdA, 0);
             break;
         case SBGALLEON_SEQEV_TEXT:
+#ifdef TARGET_PC
+            fhSetStorySequence(animUpdate->slot, gObjSeqSlotSeqIdTable[animUpdate->slot]);
+#endif
             state->textTimer = 600.0f;
             state->textRising = 1;
             state->textAlpha = 0.0f;
             break;
         }
     }
+#ifdef TARGET_PC
+    if (fhSequenceSkipRequested(animUpdate->slot, gObjSeqSlotSeqIdTable[animUpdate->slot])) {
+        state->textTimer = -1.0f;
+        state->textRising = 0;
+        state->textAlpha = 0.0f;
+    }
+#endif
     if (state->textTimer >= 0.0f) {
         state->textTimer = state->textTimer - timeDelta;
         if (state->textTimer < 0.0f) {
@@ -1011,6 +1025,11 @@ int SB_Galleon_SeqFn(GameObject* obj, int unused, ObjSeqState* animUpdate) {
         gameTextSetColor(0xff, 0xff, 0xff, state->textAlpha);
         gameTextShow(SBGALLEON_GAMETEXT);
     }
+#ifdef TARGET_PC
+    if (state->textAlpha <= 0.0f && !state->textRising) {
+        fhClearStorySequence(animUpdate->slot);
+    }
+#endif
     state->posX = obj->anim.localPosX;
     state->posY = obj->anim.localPosY;
     state->posZ = obj->anim.localPosZ;

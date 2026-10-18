@@ -12,6 +12,12 @@ int main() {
   }
 
   using namespace fh::touch;
+  Thumb thumb;
+  for (int i = 0; i < 60; ++i) thumb.follow(3, 4, 1.f / 60);
+  assert(std::hypot(thumb.x, thumb.y) <= 1.00001f);
+  assert(thumb.x > .59f && thumb.y > .79f);
+  for (int i = 0; i < 60; ++i) thumb.follow(0, 0, 1.f / 60);
+  assert(std::hypot(thumb.x, thumb.y) < .001f);
   for (auto c : defaults) assert(valid(c.x, c.y, c.radius));
   assert(!valid(-1, 0, .1f));
   assert(!valid(0, 0, std::numeric_limits<float>::quiet_NaN()));

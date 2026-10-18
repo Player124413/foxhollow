@@ -3,6 +3,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+void fhSetStorySequence(int slot, int sequenceId);
+void fhClearStorySequence(int slot);
 int fhCanSkipCutscene(void);
 int fhSkipCutscene(void);
 int fhTakeMovieSkip(void);

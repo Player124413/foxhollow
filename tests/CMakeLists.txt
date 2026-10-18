@@ -92,6 +92,7 @@ add_test(NAME cutscene_native_syntax COMMAND ${CMAKE_C_COMPILER}
     -include ${CMAKE_CURRENT_SOURCE_DIR}/../port/include/foxhollow_compat.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/engine/52_n_attractmode/n_attractmode.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/engine/2/2.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../port/src/vi_shim.c)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../port/src/vi_shim.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/objects/488_SB_Galleon/SB_Galleon.c)
 
 add_test(NAME touch_ui_router_test COMMAND touch_ui_test routed)

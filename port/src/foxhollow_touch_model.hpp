@@ -19,6 +19,18 @@ inline constexpr std::array<Control, 14> defaults{{
     {"Up", .39f, .66f, .04f, 8}, {"Down", .39f, .86f, .04f, 4},
     {"Left", .34f, .76f, .04f, 1}, {"Right", .44f, .76f, .04f, 2},
 }};
+struct Thumb {
+  float x = 0, y = 0;
+  void follow(float tx, float ty, float dt) {
+    if (!std::isfinite(tx) || !std::isfinite(ty)) tx = ty = 0;
+    float length = std::max(1.f, std::hypot(tx, ty));
+    tx /= length;
+    ty /= length;
+    const float blend = 1.f - std::exp(-24.f * std::clamp(dt, 0.f, .1f));
+    x += (tx - x) * blend;
+    y += (ty - y) * blend;
+  }
+};
 inline bool valid(float x, float y, float r) {
   return std::isfinite(x) && std::isfinite(y) && std::isfinite(r) &&
          x >= 0 && x <= 1 && y >= 0 && y <= 1 && r >= .025f && r <= .20f;
