@@ -56,8 +56,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
-      - uses: gradle/actions/setup-gradle@v4
-      - uses: actions/cache@v6
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: actions/cache/restore@v6
+        id: deps
         with:
           path: |
             ~/.cargo/registry
@@ -73,6 +74,14 @@ jobs:
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: error
+      - uses: actions/cache/save@v6
+        if: always() && steps.deps.outcome == 'success' && steps.deps.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build-android-arm64/_deps
+          key: ${{ steps.deps.outputs.cache-primary-key }}
       - if: failure()
         run: python3 android/report-ci-failure.py
       - uses: actions/upload-artifact@v7

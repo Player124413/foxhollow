@@ -18,7 +18,7 @@ for line in segments.splitlines():
         assert int(line.split()[-1], 16) >= 16384, line
 needed = subprocess.check_output([readelf, '-d', library], text=True)
 allowed = {'libc++_shared.so', 'libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so',
-           'libz.so', 'libEGL.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libvulkan.so',
+           'libz.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libvulkan.so',
            'libaaudio.so', 'libjnigraphics.so', 'libmediandk.so'}
 for dependency in re.findall(r'\(NEEDED\).*?\[(.*?)\]', needed):
     assert dependency in allowed, dependency
