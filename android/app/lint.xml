@@ -1,0 +1,6 @@
+<lint>
+    <issue id="MissingPermission">
+        <ignore path="**/org/libsdl/app/HIDDeviceBLESteamController.java" />
+        <ignore path="**/org/libsdl/app/HIDDeviceManager.java" />
+    </issue>
+</lint>

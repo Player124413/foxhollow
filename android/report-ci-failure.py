@@ -15,3 +15,16 @@ for path in paths:
     for index, block in enumerate(blocks):
         message = block[:3000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
         print(f'::error title={path.name}:{index}::{message}')
+
+import xml.etree.ElementTree as ET
+
+for path in pathlib.Path('android/app/build/reports').glob('lint-results-*.xml'):
+    for issue in ET.parse(path).getroot().findall('issue'):
+        if issue.get('severity') not in ('Error', 'Fatal'):
+            continue
+        location = issue.find('location')
+        message = issue.get('message', '')
+        if location is not None:
+            message = str(location.attrib) + '\n' + message
+        message = message[:3000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+        print(f"::error title={issue.get('id')}::{message}")

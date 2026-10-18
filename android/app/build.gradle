@@ -21,7 +21,10 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-    lint { abortOnError true }
+    lint {
+        abortOnError true
+        lintConfig file('lint.xml')
+    }
 }
 dependencies {
     testImplementation 'junit:junit:4.13.2'
