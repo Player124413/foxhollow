@@ -2,6 +2,15 @@
 #include <cassert>
 #include <limits>
 int main() {
+  for (float aspect : {.5f, 1.f, 4.f / 3, 16.f / 9, 20.f / 9}) {
+    auto c = fh::touch::defaults[0];
+    c.x = -1.f; c.y = 2.f;
+    fh::touch::constrain(c, aspect);
+    assert(fh::touch::valid(c.x, c.y, c.radius));
+    assert(c.x >= c.radius * std::min(1.f, 1.f / aspect));
+    assert(c.y <= 1.f - c.radius * std::min(1.f, aspect));
+  }
+
   using namespace fh::touch;
   for (auto c : defaults) assert(valid(c.x, c.y, c.radius));
   assert(!valid(-1, 0, .1f));

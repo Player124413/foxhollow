@@ -40,13 +40,21 @@ public final class LauncherTest {
 
     @Test public void defaultsReachGameIntent() {
         Intent intent = new Settings(context).gameIntent(context);
-        assertEquals("auto", intent.getStringExtra("renderer"));
+        assertEquals("opengles", intent.getStringExtra("renderer"));
         assertEquals("1", intent.getStringExtra("scale"));
         assertEquals("narrow", intent.getStringExtra("aspect"));
         assertEquals(100, intent.getIntExtra("volume", -1));
         assertTrue(intent.getBooleanExtra("touch", false));
         assertTrue(intent.getBooleanExtra("vsync", false));
         assertFalse(intent.getBooleanExtra("editor", true));
+    }
+
+    @Test public void oldRendererSettingsUseOpenGles() {
+        Settings settings = new Settings(context);
+        for (int renderer : new int[] {0, 1, 2, -1, 100}) {
+            settings.put("renderer", renderer);
+            assertEquals("opengles", settings.gameIntent(context).getStringExtra("renderer"));
+        }
     }
 
     @Test public void settingsPersist() {
@@ -66,7 +74,7 @@ public final class LauncherTest {
         preferences.edit().putString("renderer", "bad").putInt("scale", -20)
             .putInt("volume", 10000).putString("touch", "bad").commit();
         Intent intent = new Settings(context).gameIntent(context);
-        assertEquals("auto", intent.getStringExtra("renderer"));
+        assertEquals("opengles", intent.getStringExtra("renderer"));
         assertEquals("1", intent.getStringExtra("scale"));
         assertEquals(100, intent.getIntExtra("volume", -1));
         assertTrue(intent.getBooleanExtra("touch", false));

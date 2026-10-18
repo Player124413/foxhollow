@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 
 final class Settings {
-    static final String[] RENDERERS = {"auto", "vulkan", "opengles"};
     static final String[] SCALES = {"0.75", "1", "1.5", "2"};
     static final String[] ASPECTS = {"narrow", "wide"};
     private final SharedPreferences preferences;
@@ -34,7 +33,7 @@ final class Settings {
 
     Intent gameIntent(Context context) {
         return new Intent(context, GameActivity.class)
-            .putExtra("renderer", RENDERERS[index("renderer", RENDERERS.length, 0)])
+            .putExtra("renderer", "opengles")
             .putExtra("scale", SCALES[index("scale", SCALES.length, 1)])
             .putExtra("aspect", ASPECTS[index("aspect", ASPECTS.length, 0)])
             .putExtra("volume", index("volume", 101, 100))

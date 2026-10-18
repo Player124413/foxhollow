@@ -15,6 +15,7 @@
 #include "internal.hpp"
 #include "gfx/render_worker.hpp"
 #include "input/router.hpp"
+#include "input/imgui_touch.hpp"
 #include "webgpu/gpu.hpp"
 #include "window.hpp"
 
@@ -77,24 +78,33 @@ void enqueue_texture_upload(wgpu::Buffer buffer, wgpu::TexelCopyTextureInfo dst,
 
 input::LayerId g_inputLayer = input::kInvalidLayerId;
 bool g_cursorManaged = false;
+TouchPointer g_touchPointer;
 
 input::EventResult input_layer_event(const input::InputEvent& event, void*) {
   using Kind = input::InputSource::Kind;
   const Kind kind = event.source.kind;
-  if (ImGui::GetCurrentContext() == nullptr || (kind != Kind::Keyboard && kind != Kind::Mouse)) {
+  if (ImGui::GetCurrentContext() == nullptr || (kind != Kind::Keyboard && kind != Kind::Mouse && kind != Kind::Touch)) {
     return input::EventResult::Pass;
   }
   ImGuiIO& io = ImGui::GetIO();
   if (event.payload.is<input::InputEvent::Cancelled>()) {
     if (kind == Kind::Keyboard) {
       io.ClearInputKeys();
+    } else if (kind == Kind::Touch) {
+      g_touchPointer.reset();
     } else {
       io.ClearInputMouse();
     }
     return input::EventResult::Pass;
   }
   if (const SDL_Event* raw = input::detail::current_sdl_event()) {
-    process_event(*raw);
+    if (kind == Kind::Touch) {
+      if (const auto* pointer = event.payload.get_if<input::InputEvent::PointerChanged>()) {
+        g_touchPointer.handle(*raw, ImVec2(pointer->position.x, pointer->position.y));
+      }
+    } else {
+      process_event(*raw);
+    }
   }
   const bool capture = kind == Kind::Keyboard ? io.WantCaptureKeyboard || io.WantTextInput : io.WantCaptureMouse;
   return capture ? input::EventResult::Consume : input::EventResult::Pass;
@@ -108,6 +118,7 @@ bool input_layer_captures(const input::InputSource& source, void*) {
   switch (source.kind) {
   case input::InputSource::Kind::Keyboard:
     return io.WantCaptureKeyboard || io.WantTextInput;
+  case input::InputSource::Kind::Touch:
   case input::InputSource::Kind::Mouse:
     return io.WantCaptureMouse;
   default:
@@ -124,6 +135,7 @@ struct DrawData::Impl {
 void create_context() noexcept {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
+  g_touchPointer = TouchPointer{};
   ImGuiIO& io = ImGui::GetIO();
   g_imguiSettings = std::string{g_config.userPath} + "/imgui.ini";
   g_imguiLog = std::string{g_config.cachePath} + "/imgui.log";

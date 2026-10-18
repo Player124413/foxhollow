@@ -14,3 +14,5 @@ android/**/build/
 android/local.properties
 android/.cxx/
 android/__pycache__/
+
+.venv/

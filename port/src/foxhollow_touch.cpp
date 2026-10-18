@@ -1,10 +1,14 @@
 #include "foxhollow_touch_model.hpp"
+#include "foxhollow_touch.h"
+#include "foxhollow_cutscene.h"
+#include "foxhollow_quit.h"
 #include <aurora/imgui.h>
 #include <aurora/event.h>
 #include <dolphin/pad.h>
 #include <SDL3/SDL.h>
 #include <nlohmann/json.hpp>
 #include <cstdio>
+#include <cfloat>
 #include <cstdlib>
 #include <fstream>
 #include <string>
@@ -12,6 +16,10 @@
 namespace {
 auto controls = fh::touch::defaults;
 bool editing = false;
+bool menuOpen = false;
+bool skipPrompt = false;
+int selected = 0;
+std::array<float, 4> hudBounds{};
 bool enabled = true;
 bool showFps = false;
 bool releaseGuard = false;
@@ -49,6 +57,7 @@ extern "C" void fhTouchInit(const char* userPath) {
   editing = editor && std::string(editor) == "1";
   const char* fps = std::getenv("FOXHOLLOW_SHOW_FPS");
   showFps = fps && std::string(fps) == "1";
+  snapshot();
   if (!userPath) return;
   path = std::string(userPath) + "/touch.json";
   try {
@@ -71,13 +80,14 @@ extern "C" void fhTouchInit(const char* userPath) {
     controls = loaded;
     opacity = std::clamp(a, .1f, 1.f);
     deadzone = std::clamp(d, 0.f, .5f);
+    snapshot();
   } catch (const nlohmann::json::exception&) {}
 }
 
 extern "C" void fhTouchUpdate(void) {
   PADStatus status{};
   auto* window = SDL_GetKeyboardFocus();
-  if (!window || editing || !enabled) {
+  if (!window || editing || menuOpen || skipPrompt || !enabled) {
     contactCount = 0;
     releaseGuard = true;
     PADClearVirtualStatus(0);
@@ -100,6 +110,9 @@ extern "C" void fhTouchUpdate(void) {
       int selected = -1;
       for (int i = 0; i < oldCount; ++i)
         if (old[i].device == devices[d] && old[i].finger == finger.id) selected = old[i].control;
+      if (selected == -1 && hudBounds[2] > hudBounds[0] &&
+          finger.x >= hudBounds[0] && finger.x <= hudBounds[2] &&
+          finger.y >= hudBounds[1] && finger.y <= hudBounds[3]) selected = -2;
       if (selected == -1) {
         float nearest = 1.f;
         for (size_t i = 0; i < controls.size(); ++i) {
@@ -146,101 +159,247 @@ extern "C" void fhTouchUpdate(void) {
   else PADClearVirtualStatus(0);
 }
 
+namespace {
+void release() {
+  releaseGuard = true;
+  contactCount = 0;
+  PADClearVirtualStatus(0);
+}
+void cancel() {
+  controls = previousControls;
+  opacity = previousOpacity;
+  deadzone = previousDeadzone;
+  menuOpen = editing = false;
+  saveFailed = false;
+  release();
+}
+void openMenu() {
+  snapshot();
+  menuOpen = true;
+  saveFailed = false;
+  release();
+}
+void percentage(const char* label, float& value, float low, float high) {
+  ImGui::PushID(label);
+  ImGui::TextUnformatted(label);
+  ImGui::SetNextItemWidth(-FLT_MIN);
+  float percent = value * 100.f;
+  if (ImGui::SliderFloat("##value", &percent, low * 100.f, high * 100.f, "%.0f%%", ImGuiSliderFlags_NoInput))
+    value = percent / 100.f;
+  ImGui::PopID();
+}
+void footer(float scale) {
+  if (saveFailed) ImGui::TextColored(ImVec4(1, .3f, .3f, 1), "touch.json: I/O error");
+  float width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2.f;
+  if (ImGui::Button("Save controls", ImVec2(width, 44 * scale))) {
+    saveFailed = path.empty() || !save();
+    if (!saveFailed) menuOpen = editing = false;
+    release();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Cancel", ImVec2(width, 44 * scale))) cancel();
+}
+void drawControls(ImDrawList* draw, ImVec2 origin, ImVec2 size, bool preview) {
+  float unit = std::min(size.x, size.y);
+  for (size_t i = 0; i < controls.size(); ++i) {
+    const auto& c = controls[i];
+    ImVec2 center(origin.x + c.x * size.x, origin.y + c.y * size.y);
+    float r = c.radius * unit;
+    bool highlight = preview && selected == static_cast<int>(i);
+    draw->AddCircleFilled(center, r, ImGui::GetColorU32(ImVec4(highlight ? .15f : .08f, .22f, .35f,
+                                                          preview ? .8f : opacity)), 48);
+    draw->AddCircle(center, r, highlight ? IM_COL32(90, 195, 255, 255) : IM_COL32(210, 225, 245, 180),
+                    48, highlight ? 3.f : 1.f);
+    auto text = ImGui::CalcTextSize(c.label);
+    draw->AddText(ImVec2(center.x - text.x / 2, center.y - text.y / 2), IM_COL32_WHITE, c.label);
+  }
+}
+constexpr ImGuiWindowFlags panelFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+                                       ImGuiWindowFlags_NoMove;
+}
+
+extern "C" int fhTouchMenuOpen(void) { return menuOpen || editing || skipPrompt; }
+
+extern "C" void fhTouchHandleEvent(const SDL_Event* event) {
+  if (!event || event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
+      (event->key.key != SDLK_ESCAPE && event->key.key != SDLK_AC_BACK)) return;
+  if (skipPrompt) {
+    skipPrompt = false;
+    release();
+  } else if (editing) {
+    editing = false;
+    menuOpen = true;
+    release();
+  } else if (menuOpen) cancel();
+  else openMenu();
+}
+
 extern "C" void fhTouchDraw(void) {
   auto& io = ImGui::GetIO();
-  auto size = io.DisplaySize;
-  if (showFps) {
-    ImGui::SetNextWindowPos(ImVec2(12, 12), ImGuiCond_Always);
+  const ImVec2 size = io.DisplaySize;
+  const float unit = std::min(size.x, size.y);
+  if (unit <= 0) return;
+  const float scale = std::clamp(unit / 480.f, .75f, 3.f);
+  static const ImGuiStyle baseStyle = [] {
+    ImGuiStyle style = ImGui::GetStyle();
+    style.WindowPadding = ImVec2(14, 14);
+    style.FramePadding = ImVec2(12, 10);
+    style.ItemSpacing = ImVec2(10, 10);
+    style.WindowRounding = 12;
+    style.FrameRounding = 8;
+    style.GrabRounding = 8;
+    style.GrabMinSize = 24;
+    style.ScrollbarSize = 26;
+    return style;
+  }();
+  ImGui::GetStyle() = baseStyle;
+  ImGui::GetStyle().ScaleAllSizes(scale);
+  io.FontGlobalScale = scale * 1.25f;
+  auto* background = ImGui::GetBackgroundDrawList();
+  if (fhTouchMenuOpen()) background->AddRectFilled(ImVec2(0, 0), size, IM_COL32(10, 17, 28, 255));
+  else if (enabled) drawControls(background, ImVec2(0, 0), size, false);
+  if (showFps && !fhTouchMenuOpen()) {
+    ImGui::SetNextWindowPos(ImVec2(12 * scale, 12 * scale), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(.65f);
-    ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
-                 ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings);
+    ImGui::Begin("FPS", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs);
     ImGui::Text("%.1f FPS | %.2f ms", io.Framerate, io.Framerate > 0 ? 1000.f / io.Framerate : 0.f);
     ImGui::End();
   }
-  if (!enabled) return;
-  float unit = std::min(size.x, size.y);
-  if (unit <= 0) return;
-  static bool uiInitialized = false;
-  if (!uiInitialized) {
-    float scale = std::clamp(unit / 480.f, 1.f, 3.f);
-    io.FontGlobalScale = scale;
-    ImGui::GetStyle().ScaleAllSizes(scale);
-    uiInitialized = true;
-  }
-  auto* draw = ImGui::GetBackgroundDrawList();
-  for (size_t i = 0; i < controls.size(); ++i) {
-    auto& c = controls[i];
-    ImVec2 center(c.x * size.x, c.y * size.y);
-    float r = c.radius * unit;
-    draw->AddCircleFilled(center, r, ImGui::GetColorU32(ImVec4(.12f, .15f, .2f, opacity)), 32);
-    draw->AddCircle(center, r, IM_COL32(230, 235, 255, 180), 32);
-    auto text = ImGui::CalcTextSize(c.label);
-    draw->AddText(ImVec2(center.x - text.x / 2, center.y - text.y / 2), IM_COL32_WHITE, c.label);
-    if (editing) {
-      ImGui::SetNextWindowPos(ImVec2(center.x - r, center.y - r));
-      ImGui::SetNextWindowSize(ImVec2(r * 2, r * 2));
-      ImGui::PushID(static_cast<int>(i));
-      ImGui::Begin(c.label, nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
-                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove);
-      ImGui::InvisibleButton("##drag", ImVec2(r * 2 - 16, r * 2 - 16));
-      if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
-        c.x = std::clamp(c.x + io.MouseDelta.x / size.x, r / size.x, 1 - r / size.x);
-        c.y = std::clamp(c.y + io.MouseDelta.y / size.y, r / size.y, 1 - r / size.y);
+  hudBounds = {};
+  if (!fhTouchMenuOpen()) {
+    ImGui::SetNextWindowPos(ImVec2(size.x * .55f, size.y - 12 * scale), ImGuiCond_Always, ImVec2(.5f, 1));
+    ImGui::Begin("Touch toolbar", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize);
+    if (ImGui::Button("Menu", ImVec2(104 * scale, 44 * scale))) openMenu();
+    if (fhCanSkipCutscene()) {
+      ImGui::SameLine();
+      if (ImGui::Button("Skip scene", ImVec2(148 * scale, 44 * scale))) {
+        skipPrompt = true;
+        release();
       }
-      ImGui::End();
-      ImGui::PopID();
     }
+    const auto pos = ImGui::GetWindowPos();
+    const auto bounds = ImGui::GetWindowSize();
+    hudBounds = {pos.x / size.x, pos.y / size.y, (pos.x + bounds.x) / size.x, (pos.y + bounds.y) / size.y};
+    ImGui::End();
   }
-  ImGui::SetNextWindowPos(ImVec2(size.x / 2, size.y - 12), ImGuiCond_Always, ImVec2(.5f, 1.f));
-  ImGui::Begin("Touch", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration |
-               ImGuiWindowFlags_NoSavedSettings);
-  if (ImGui::Button(editing ? "Save controls" : "Edit controls")) {
-    if (!editing) snapshot();
-    editing = !editing;
-    releaseGuard = true;
-    contactCount = 0;
-    PADClearVirtualStatus(0);
-    if (!editing) {
-      saveFailed = path.empty() || !save();
-      if (saveFailed) editing = true;
-    }
-  }
-  static bool options = true;
   if (editing) {
+    float panelWidth = std::min(320 * scale, size.x * .44f);
+    ImVec2 space(size.x - panelWidth - 28 * scale, size.y - 28 * scale);
+    float fit = std::min(space.x / size.x, space.y / size.y);
+    ImVec2 canvas(size.x * fit, size.y * fit);
+    ImVec2 origin((size.x - panelWidth - canvas.x) / 2, (size.y - canvas.y) / 2);
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2(size.x - panelWidth, size.y));
+    ImGui::Begin("Layout preview", nullptr, panelFlags | ImGuiWindowFlags_NoBackground |
+                 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::InvisibleButton("##layout", canvas);
+    static bool dragging = false;
+    if (ImGui::IsItemClicked()) {
+      dragging = false;
+      float nearest = FLT_MAX;
+      for (size_t i = 0; i < controls.size(); ++i) {
+        const auto& c = controls[i];
+        float radius = std::max(c.radius * std::min(canvas.x, canvas.y), 22 * scale);
+        float distance = std::hypot(io.MousePos.x - origin.x - c.x * canvas.x,
+                                    io.MousePos.y - origin.y - c.y * canvas.y) / radius;
+        if (distance <= 1.f && distance < nearest) {
+          selected = static_cast<int>(i);
+          nearest = distance;
+          dragging = true;
+        }
+      }
+    }
+    if (dragging && ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
+      auto& c = controls[selected];
+      c.x += io.MouseDelta.x / canvas.x;
+      c.y += io.MouseDelta.y / canvas.y;
+      fh::touch::constrain(c, size.x / size.y);
+    }
+    auto* draw = ImGui::GetWindowDrawList();
+    ImVec2 corner(origin.x + canvas.x, origin.y + canvas.y);
+    draw->AddRectFilled(origin, corner, IM_COL32(18, 30, 46, 255), 8 * scale);
+    draw->AddRect(origin, corner, IM_COL32(60, 90, 115, 255), 8 * scale);
+    drawControls(draw, origin, canvas, true);
+    ImGui::End();
+    ImGui::SetNextWindowPos(ImVec2(size.x - panelWidth, 0));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, size.y));
+    ImGui::Begin("Control layout", nullptr, panelFlags);
+    ImGui::TextUnformatted("Edit controls");
+    if (ImGui::BeginChild("Layout fields", ImVec2(0, -(saveFailed ? 90 : 60) * scale))) {
+      ImGui::SetNextItemWidth(-FLT_MIN);
+      if (ImGui::BeginCombo("##Control", controls[selected].label)) {
+        for (size_t i = 0; i < controls.size(); ++i)
+          if (ImGui::Selectable(controls[i].label, selected == static_cast<int>(i), 0, ImVec2(0, 32 * scale)))
+            selected = static_cast<int>(i);
+        ImGui::EndCombo();
+      }
+      auto& c = controls[selected];
+      percentage("Position X", c.x, 0.f, 1.f);
+      percentage("Position Y", c.y, 0.f, 1.f);
+      percentage("Size", c.radius, .025f, .20f);
+      fh::touch::constrain(c, size.x / size.y);
+      if (ImGui::Button("Reset selected", ImVec2(-FLT_MIN, 44 * scale))) c = fh::touch::defaults[selected];
+      if (ImGui::Button("Settings", ImVec2(-FLT_MIN, 44 * scale))) { editing = false; menuOpen = true; }
+    }
+    ImGui::EndChild();
+    footer(scale);
+    ImGui::End();
+  } else if (menuOpen) {
+    ImGui::SetNextWindowPos(ImVec2(size.x / 2, size.y / 2), ImGuiCond_Always, ImVec2(.5f, .5f));
+    ImGui::SetNextWindowSize(ImVec2(std::min(440 * scale, size.x * .94f), std::min(460 * scale, size.y * .94f)));
+    ImGui::Begin("Touch settings", nullptr, panelFlags);
+    ImGui::TextUnformatted("Controls");
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
-      controls = previousControls;
-      opacity = previousOpacity;
-      deadzone = previousDeadzone;
-      editing = false;
-      saveFailed = false;
-      releaseGuard = true;
+    ImGui::TextDisabled("OpenGL ES");
+    if (ImGui::BeginChild("Settings fields", ImVec2(0, -(saveFailed ? 90 : 60) * scale))) {
+      if (ImGui::Button("Edit controls", ImVec2(-FLT_MIN, 52 * scale))) {
+        menuOpen = false;
+        editing = true;
+        release();
+      }
+      percentage("Opacity", opacity, .1f, 1.f);
+      percentage("Deadzone", deadzone, 0.f, .5f);
+      if (ImGui::Button("Reset controls", ImVec2(-FLT_MIN, 44 * scale))) {
+        controls = fh::touch::defaults;
+        opacity = .45f;
+        deadzone = .15f;
+      }
+    }
+    ImGui::EndChild();
+    footer(scale);
+    ImGui::End();
+  }
+  if (skipPrompt && !ImGui::IsPopupOpen("Skip scene?")) ImGui::OpenPopup("Skip scene?");
+  ImGui::SetNextWindowPos(ImVec2(size.x / 2, size.y / 2), ImGuiCond_Always, ImVec2(.5f, .5f));
+  ImGui::SetNextWindowSize(ImVec2(std::min(360 * scale, size.x * .94f), 0));
+  if (ImGui::BeginPopupModal("Skip scene?", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!skipPrompt) ImGui::CloseCurrentPopup();
+    float width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2;
+    if (ImGui::Button("Skip", ImVec2(width, 48 * scale))) {
+      fhSkipCutscene();
+      skipPrompt = false;
+      release();
+      ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Settings")) options = !options;
-  }
-  if (saveFailed) ImGui::TextColored(ImVec4(1, .3f, .3f, 1), "touch.json: I/O error");
-  if (editing && options) {
-    ImGui::SliderFloat("Opacity", &opacity, .1f, 1.f);
-    ImGui::SliderFloat("Deadzone", &deadzone, 0.f, .5f);
-    static int selected = 0;
-    if (ImGui::BeginCombo("Control", controls[selected].label)) {
-      for (size_t i = 0; i < controls.size(); ++i)
-        if (ImGui::Selectable(controls[i].label, selected == static_cast<int>(i))) selected = static_cast<int>(i);
-      ImGui::EndCombo();
+    if (ImGui::Button("Back", ImVec2(width, 48 * scale))) {
+      skipPrompt = false;
+      release();
+      ImGui::CloseCurrentPopup();
     }
-    ImGui::SliderFloat("Size", &controls[selected].radius, .025f, .20f);
-    if (ImGui::Button("Reset")) { controls = fh::touch::defaults; opacity = .45f; deadzone = .15f; }
+    ImGui::EndPopup();
   }
-  ImGui::End();
 }
 
 extern "C" int fhTouchConfigure(void) {
-  snapshot();
-  while (editing && enabled) {
+  while (fhTouchMenuOpen()) {
+    if (fhQuitRequested()) return 0;
     for (const AuroraEvent* event = aurora_update(); event && event->type != AURORA_NONE; ++event) {
       if (event->type == AURORA_EXIT) return 0;
+      if (event->type == AURORA_SDL_EVENT) fhTouchHandleEvent(&event->sdl);
     }
+    fhTouchUpdate();
     if (aurora_begin_frame()) {
       fhTouchDraw();
       aurora_end_frame();

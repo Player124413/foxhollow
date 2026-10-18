@@ -18,9 +18,8 @@
         <LinearLayout android:id="@+id/settings" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="vertical">
             <TextView style="@style/Heading" android:text="@string/graphics" />
-            <TextView style="@style/Label" android:text="@string/renderer" android:labelFor="@id/renderer" />
-            <Spinner android:id="@+id/renderer" android:layout_width="match_parent" android:layout_height="48dp"
-                android:entries="@array/renderer_labels" />
+            <TextView style="@style/Label" android:text="@string/renderer" />
+            <TextView style="@style/Label" android:text="@string/renderer_opengles" />
             <TextView style="@style/Label" android:text="@string/resolution" android:labelFor="@id/render_scale" />
             <Spinner android:id="@+id/render_scale" android:layout_width="match_parent" android:layout_height="48dp"
                 android:entries="@array/scale_labels" />

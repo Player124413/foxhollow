@@ -65,6 +65,9 @@ void set_present_viewport(const wgpu::RenderPassEncoder& pass, const gfx::Viewpo
 
 #ifdef AURORA_ENABLE_GX
 constexpr std::array PreferredBackendOrder{
+#if defined(__ANDROID__)
+    BACKEND_OPENGLES,
+#else
 #ifdef ENABLE_BACKEND_WEBGPU
     BACKEND_WEBGPU,
 #endif
@@ -88,6 +91,7 @@ constexpr std::array PreferredBackendOrder{
 #endif
 #ifdef DAWN_ENABLE_BACKEND_NULL
     BACKEND_NULL,
+#endif
 #endif
 };
 #else

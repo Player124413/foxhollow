@@ -25,8 +25,9 @@ void fhDebugOverlayFramePresented(void);
 #endif
 void fhGalleryUpdate(void);
 #if defined(__ANDROID__)
-void fhTouchUpdate(void);
-void fhTouchDraw(void);
+#include "foxhollow_touch.h"
+#include <dolphin/os.h>
+extern OSStopwatch gFrameStopwatch;
 #endif
 
 static VIRetraceCallback sPreRetraceCallback;
@@ -88,6 +89,9 @@ static void pump_events(void) {
     if (event->type == AURORA_EXIT) {
       quitting = 1;
     }
+#if defined(__ANDROID__)
+    if (event->type == AURORA_SDL_EVENT) fhTouchHandleEvent(&event->sdl);
+#endif
     ++event;
   }
 #if defined(__ANDROID__)
@@ -122,6 +126,14 @@ void VIWaitForRetrace(void) {
 #endif
     sFrameOpen = 0;
   }
+#if defined(__ANDROID__)
+  int menuWasOpen = fhTouchMenuOpen();
+  if (!fhTouchConfigure()) shutdown_and_exit();
+  if (menuWasOpen) {
+    OSResetStopwatch(&gFrameStopwatch);
+    OSStartStopwatch(&gFrameStopwatch);
+  }
+#endif
   fhModsUpdate();
   fhGalleryUpdate();
   fhAutosaveUpdate();

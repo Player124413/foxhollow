@@ -68,6 +68,10 @@ static int parse_language(const char* value) {
 }
 
 static AuroraBackend parse_backend(const char* value) {
+#if defined(__ANDROID__)
+  (void)value;
+  return BACKEND_OPENGLES;
+#else
   static const struct {
     const char* name;
     AuroraBackend backend;
@@ -86,6 +90,7 @@ static AuroraBackend parse_backend(const char* value) {
     }
   }
   return BACKEND_AUTO;
+#endif
 }
 
 static void load(void) {

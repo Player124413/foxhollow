@@ -25,8 +25,8 @@
     <string name="io_error">Ошибка доступа к файлам</string>
     <string name="import_cancel">Отмена</string>
     <string name="legal">Для игры нужен ваш собственный легально полученный образ Star Fox Adventures: ISO, RVZ или WIA. Игровые данные не входят в APK.</string>
-    <string name="performance_note">Целевой лимит — 60 кадров/с. При нехватке производительности уменьшите масштаб рендера или попробуйте другой API. Изменения применяются при следующем запуске.</string>
-    <string-array name="renderer_labels"><item>Автоматически</item><item>Vulkan</item><item>OpenGL ES</item></string-array>
+    <string name="performance_note">Целевой лимит — 60 кадров/с. При нехватке производительности уменьшите масштаб рендера. Изменения применяются при следующем запуске.</string>
+    <string name="renderer_opengles">OpenGL ES</string>
     <string-array name="scale_labels"><item>0.75× · экономичный</item><item>1× · стандартный</item><item>1.5×</item><item>2× · высокое качество</item></string-array>
     <string-array name="aspect_labels"><item>4:3 · оригинал</item><item>16:9 · широкий экран</item></string-array>
 </resources>

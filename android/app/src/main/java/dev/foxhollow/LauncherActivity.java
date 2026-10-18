@@ -62,7 +62,6 @@ public final class LauncherActivity extends Activity {
         findViewById(R.id.import_cancel).setOnClickListener(view -> {
             cancelImport = true;
         });
-        bindSpinner(R.id.renderer, "renderer", Settings.RENDERERS.length, 0);
         bindSpinner(R.id.render_scale, "scale", Settings.SCALES.length, 1);
         bindSpinner(R.id.aspect, "aspect", Settings.ASPECTS.length, 0);
         bindSwitch(R.id.vsync, "vsync");

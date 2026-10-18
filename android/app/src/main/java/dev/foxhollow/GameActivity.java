@@ -28,7 +28,7 @@ public final class GameActivity extends BorealisActivity {
         SDLActivity.nativeSetenv("FOXHOLLOW_MEMORY_CARD", new File(getFilesDir(), "memorycard.raw").getAbsolutePath());
         SDLActivity.nativeSetenv("FOXHOLLOW_AUTOSAVE", new File(getFilesDir(), "autosave.bin").getAbsolutePath());
         SDLActivity.nativeSetenv("FOXHOLLOW_FULLSCREEN", "1");
-        SDLActivity.nativeSetenv("FOXHOLLOW_RENDERER", allowed(intent.getStringExtra("renderer"), Settings.RENDERERS, "auto"));
+        SDLActivity.nativeSetenv("FOXHOLLOW_RENDERER", "opengles");
         SDLActivity.nativeSetenv("FOXHOLLOW_RENDER_SCALE", allowed(intent.getStringExtra("scale"), Settings.SCALES, "1"));
         SDLActivity.nativeSetenv("FOXHOLLOW_SCREEN_STYLE", allowed(intent.getStringExtra("aspect"), Settings.ASPECTS, "narrow"));
         SDLActivity.nativeSetenv("FOXHOLLOW_FRAME_LIMIT", "60");

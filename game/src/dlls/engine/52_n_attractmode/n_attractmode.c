@@ -1,3 +1,6 @@
+#if defined(TARGET_PC)
+#include "foxhollow_cutscene.h"
+#endif
 #include "main/sky.h"
 #include "main/attract_movie.h"
 #include "main/screen_transition.h"
@@ -440,6 +443,14 @@ void TitleMenu_frameEnd(void)
         loadSaveSettings();                                                                                            \
     } while (0)
 
+#if defined(TARGET_PC)
+int fhMovieCanSkip(void)
+{
+    return gAttractMovieState == NATTRACTMODE_MOVIE_STATE_PREPARED &&
+           gAttractMoviePlaybackEnabled != 0 && gTitleMenuReadyForInput != 0;
+}
+#endif
+
 int TitleMenu_run(void)
 {
     int menuId;
@@ -450,6 +461,9 @@ int TitleMenu_run(void)
     u8 inputPressed;
     s8 dpad;
     s8 face;
+#if defined(TARGET_PC)
+    int skipMovie = fhTakeMovieSkip();
+#endif
 
     previousFadeTimer = gTitleMenuLoadDelay;
     frames = framesThisStep;
@@ -503,6 +517,9 @@ int TitleMenu_run(void)
         (gTitleMenuReadyForInput != 0))
     {
         buttons = getButtonsJustPressed(0);
+#if defined(TARGET_PC)
+        if (skipMovie) buttons |= PAD_BUTTON_MENU;
+#endif
         padGetAnalogInput(0, &dpad, &face);
         buttonDisable(0, buttons);
         padClearAnalogInputX(0);

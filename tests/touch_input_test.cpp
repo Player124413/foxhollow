@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include "foxhollow_touch.h"
 #include <dolphin/pad.h>
 #include <cassert>
 #include <cstdlib>
@@ -57,6 +58,17 @@ int main() {
   fingers[0].x = .89f; fingers[0].y = .67f;
   fhTouchUpdate(); assert(result.button == 0);
   fingers.clear(); fhTouchUpdate(); assert(!active);
+  fingers = {{7, .89f, .67f, 1}}; fhTouchUpdate(); assert(result.button == PAD_BUTTON_A);
+  SDL_Event back{};
+  back.type = SDL_EVENT_KEY_DOWN;
+  back.key.key = SDLK_AC_BACK;
+  fhTouchHandleEvent(&back);
+  assert(fhTouchMenuOpen());
+  fhTouchUpdate(); assert(!active);
+  fhTouchHandleEvent(&back);
+  assert(!fhTouchMenuOpen());
+  fhTouchUpdate(); assert(!active);
+  fingers.clear(); fhTouchUpdate();
   fingers = {{7, .89f, .67f, 1}}; fhTouchUpdate(); assert(result.button == PAD_BUTTON_A);
   fingers[0].x = .1f; fhTouchUpdate(); assert(result.button == 0);
   fingers.clear(); fhTouchUpdate(); assert(!active);

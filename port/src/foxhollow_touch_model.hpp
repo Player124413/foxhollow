@@ -23,6 +23,13 @@ inline bool valid(float x, float y, float r) {
   return std::isfinite(x) && std::isfinite(y) && std::isfinite(r) &&
          x >= 0 && x <= 1 && y >= 0 && y <= 1 && r >= .025f && r <= .20f;
 }
+inline void constrain(Control& control, float aspect) {
+  if (!std::isfinite(aspect) || aspect <= 0.f) return;
+  const float rx = control.radius * std::min(1.f, 1.f / aspect);
+  const float ry = control.radius * std::min(1.f, aspect);
+  control.x = std::clamp(control.x, rx, 1.f - rx);
+  control.y = std::clamp(control.y, ry, 1.f - ry);
+}
 inline std::array<int8_t, 2> stick(float x, float y, float deadzone) {
   if (!std::isfinite(x) || !std::isfinite(y)) return {0, 0};
   const float length = std::hypot(x, y);
