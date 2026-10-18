@@ -22,13 +22,16 @@ public:
     if (event.type != SDL_EVENT_FINGER_DOWN && event.type != SDL_EVENT_FINGER_MOTION &&
         event.type != SDL_EVENT_FINGER_UP && event.type != SDL_EVENT_FINGER_CANCELED) return false;
     const auto& finger = event.tfinger;
+    auto& io = ImGui::GetIO();
+    if (event.type == SDL_EVENT_FINGER_DOWN && m_active &&
+        (m_device != finger.touchID || m_finger != finger.fingerID) &&
+        io.MouseDown[0] && !io.WantCaptureMouse && !ImGui::IsAnyItemActive()) reset();
     if (event.type == SDL_EVENT_FINGER_DOWN && !m_active) {
       m_device = finger.touchID;
       m_finger = finger.fingerID;
       m_active = true;
     }
     if (!m_active || m_device != finger.touchID || m_finger != finger.fingerID) return false;
-    auto& io = ImGui::GetIO();
     io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
     if (event.type == SDL_EVENT_FINGER_CANCELED) {
       reset();

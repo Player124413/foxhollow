@@ -155,6 +155,12 @@ int main(int argc, char**) {
     detail::focus_lost(); frame(); frame();
     assert(!io.MouseDown[0] && !fhTouchMenuOpen());
     touch(SDL_EVENT_FINGER_UP, pos); frame();
+    assert(touch(SDL_EVENT_FINGER_DOWN, ImVec2(30, 200), 70)); frame(); frame();
+    assert(io.MouseDown[0] && !io.WantCaptureMouse);
+    click("Menu"); assert(fhTouchMenuOpen());
+    touch(SDL_EVENT_FINGER_MOTION, ImVec2(50, 200), 70); frame();
+    touch(SDL_EVENT_FINGER_UP, ImVec2(50, 200), 70); frame();
+    click("Cancel"); assert(!fhTouchMenuOpen());
   }
   for (ImVec2 size : {ImVec2(640, 480), ImVec2(800, 480), ImVec2(2400, 1080), ImVec2(960, 540)}) {
     io.DisplaySize = size; frame(); frame(); frame();
