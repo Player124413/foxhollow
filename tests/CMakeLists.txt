@@ -22,7 +22,8 @@ add_library(imgui_test STATIC
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp ${imgui_SOURCE_DIR}/imgui_tables.cpp)
 target_include_directories(imgui_test PUBLIC ${imgui_SOURCE_DIR})
 target_compile_definitions(imgui_test PUBLIC IMGUI_ENABLE_TEST_ENGINE)
-add_executable(touch_ui_test touch_ui_test.cpp ../port/src/foxhollow_touch.cpp ../port/src/foxhollow_cutscene.c)
+add_executable(touch_ui_test touch_ui_test.cpp ../port/src/foxhollow_touch.cpp
+    ../port/src/foxhollow_cutscene.c ../port/src/foxhollow_quit.c)
 target_compile_definitions(touch_ui_test PRIVATE TARGET_PC)
 target_include_directories(touch_ui_test PRIVATE ../port/include
     ../extern/aurora/include ${sdl_SOURCE_DIR}/include ${json_SOURCE_DIR}/include)
@@ -75,3 +76,15 @@ foreach(renderer IN ITEMS auto vulkan opengles null invalid)
     set_tests_properties(android_renderer_${renderer} PROPERTIES ENVIRONMENT "FOXHOLLOW_RENDERER=${renderer}")
 endforeach()
 add_test(NAME android_renderer_default COMMAND config_android_test 1)
+
+add_test(NAME cutscene_native_syntax COMMAND ${CMAKE_C_COMPILER}
+    -fsyntax-only -w -Wno-error=incompatible-pointer-types -std=gnu11
+    -DTARGET_PC -D__ANDROID__ -DAURORA -DBUILD_VERSION=0 -DVERSION_GSAE01
+    -I${CMAKE_CURRENT_SOURCE_DIR}/../port/include
+    -I${CMAKE_CURRENT_SOURCE_DIR}/../extern/aurora/include
+    -I${CMAKE_CURRENT_SOURCE_DIR}/../game/include -I${CMAKE_CURRENT_SOURCE_DIR}/../game
+    -I${CMAKE_CURRENT_SOURCE_DIR}/../extern/musyx/include -I${sdl_SOURCE_DIR}/include
+    -include ${CMAKE_CURRENT_SOURCE_DIR}/../port/include/foxhollow_compat.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/engine/52_n_attractmode/n_attractmode.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/engine/2/2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../port/src/vi_shim.c)

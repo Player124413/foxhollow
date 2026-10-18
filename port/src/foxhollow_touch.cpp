@@ -18,6 +18,7 @@ auto controls = fh::touch::defaults;
 bool editing = false;
 bool menuOpen = false;
 bool skipPrompt = false;
+bool quitPrompt = false;
 int selected = 0;
 std::array<float, 4> hudBounds{};
 bool enabled = true;
@@ -87,7 +88,7 @@ extern "C" void fhTouchInit(const char* userPath) {
 extern "C" void fhTouchUpdate(void) {
   PADStatus status{};
   auto* window = SDL_GetKeyboardFocus();
-  if (!window || editing || menuOpen || skipPrompt || !enabled) {
+  if (!window || editing || menuOpen || skipPrompt || quitPrompt || !enabled) {
     contactCount = 0;
     releaseGuard = true;
     PADClearVirtualStatus(0);
@@ -218,12 +219,15 @@ constexpr ImGuiWindowFlags panelFlags = ImGuiWindowFlags_NoDecoration | ImGuiWin
                                        ImGuiWindowFlags_NoMove;
 }
 
-extern "C" int fhTouchMenuOpen(void) { return menuOpen || editing || skipPrompt; }
+extern "C" int fhTouchMenuOpen(void) { return menuOpen || editing || skipPrompt || quitPrompt; }
 
 extern "C" void fhTouchHandleEvent(const SDL_Event* event) {
   if (!event || event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
       (event->key.key != SDLK_ESCAPE && event->key.key != SDLK_AC_BACK)) return;
-  if (skipPrompt) {
+  if (quitPrompt) {
+    quitPrompt = false;
+    release();
+  } else if (skipPrompt) {
     skipPrompt = false;
     release();
   } else if (editing) {
@@ -365,6 +369,7 @@ extern "C" void fhTouchDraw(void) {
         opacity = .45f;
         deadzone = .15f;
       }
+      if (ImGui::Button("Launcher", ImVec2(-FLT_MIN, 44 * scale))) quitPrompt = true;
     }
     ImGui::EndChild();
     footer(scale);
@@ -375,6 +380,7 @@ extern "C" void fhTouchDraw(void) {
   ImGui::SetNextWindowSize(ImVec2(std::min(360 * scale, size.x * .94f), 0));
   if (ImGui::BeginPopupModal("Skip scene?", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize)) {
     if (!skipPrompt) ImGui::CloseCurrentPopup();
+    ImGui::TextUnformatted("Skip scene?");
     float width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2;
     if (ImGui::Button("Skip", ImVec2(width, 48 * scale))) {
       fhSkipCutscene();
@@ -386,6 +392,26 @@ extern "C" void fhTouchDraw(void) {
     if (ImGui::Button("Back", ImVec2(width, 48 * scale))) {
       skipPrompt = false;
       release();
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+  if (quitPrompt && !ImGui::IsPopupOpen("Return to launcher?")) ImGui::OpenPopup("Return to launcher?");
+  ImGui::SetNextWindowPos(ImVec2(size.x / 2, size.y / 2), ImGuiCond_Always, ImVec2(.5f, .5f));
+  ImGui::SetNextWindowSize(ImVec2(std::min(360 * scale, size.x * .94f), 0));
+  if (ImGui::BeginPopupModal("Return to launcher?", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!quitPrompt) ImGui::CloseCurrentPopup();
+    ImGui::TextUnformatted("Return to launcher?");
+    float width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2;
+    if (ImGui::Button("Exit game", ImVec2(width, 48 * scale))) {
+      quitPrompt = false;
+      cancel();
+      fhRequestQuit();
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Back", ImVec2(width, 48 * scale))) {
+      quitPrompt = false;
       ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
@@ -406,5 +432,5 @@ extern "C" int fhTouchConfigure(void) {
     }
     SDL_Delay(16);
   }
-  return 1;
+  return !fhQuitRequested();
 }

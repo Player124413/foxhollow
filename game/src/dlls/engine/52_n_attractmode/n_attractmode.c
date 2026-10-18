@@ -1,5 +1,6 @@
 #if defined(TARGET_PC)
 #include "foxhollow_cutscene.h"
+#include <dolphin/pad.h>
 #endif
 #include "main/sky.h"
 #include "main/attract_movie.h"

@@ -1,5 +1,6 @@
 #include "foxhollow_touch.h"
 #include "foxhollow_cutscene.h"
+#include "foxhollow_quit.h"
 #include "../port/src/foxhollow_touch_model.hpp"
 #include "../extern/aurora/lib/input/imgui_touch.hpp"
 #include <imgui_internal.h>
@@ -177,6 +178,10 @@ int main() {
   click("Menu"); click("Edit controls");
   assert(fhTouchMenuOpen());
   click("Cancel"); assert(!fhTouchMenuOpen());
+  click("Menu"); click("Launcher"); click("Back");
+  assert(fhTouchMenuOpen() && !fhQuitRequested());
+  click("Launcher"); click("Exit game");
+  assert(!fhTouchMenuOpen() && fhQuitRequested());
   assert(clears > 0);
   ImGui::DestroyContext();
   std::filesystem::remove_all(path);
