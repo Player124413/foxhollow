@@ -10,7 +10,8 @@ esac
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 : "${ANDROID_HOME:?ANDROID_HOME}"
 export ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-29.0.14206865}"
-export ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION}"
+export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+export ANDROID_NDK_HOME="$ANDROID_NDK_ROOT"
 [[ -f "$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" ]] || { printf '%s\n' ANDROID_NDK_ROOT >&2; exit 2; }
 [[ -f "$ANDROID_HOME/platforms/android-35/android.jar" ]] || { printf '%s\n' ANDROID_PLATFORM_35 >&2; exit 2; }
 for program in cmake ninja rustup cargo python3; do command -v "$program" >/dev/null; done
@@ -26,6 +27,8 @@ esac
 bin="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$host/bin"
 [[ -x "$bin/${triple}28-clang" ]] || { printf '%s\n' ANDROID_NDK_CLANG >&2; exit 2; }
 export PATH="$bin:$PATH"
+"$bin/${triple}28-clang++" --version
+printf '#include <thread>\n#include <stop_token>\nint main() { std::jthread thread; return thread.joinable(); }\n' | "$bin/${triple}28-clang++" -x c++ -std=c++20 -fsyntax-only -
 rustup target add "$rust_target"
 suffix="${rust_target//-/_}"
 export "CC_${suffix}=$bin/${triple}28-clang"
