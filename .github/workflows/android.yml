@@ -32,7 +32,7 @@ jobs:
   input-tests:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cmake -S tests -B build-input-tests -G Ninja -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build-input-tests --parallel 2
       - run: ctest --test-dir build-input-tests --output-on-failure
@@ -44,20 +44,20 @@ jobs:
       ANDROID_NDK_VERSION: 29.0.14206865
       CMAKE_BUILD_PARALLEL_LEVEL: 2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' "ndk;$ANDROID_NDK_VERSION"
+      - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "ndk;$ANDROID_NDK_VERSION" 2>&1 | tee android-sdk.log'
+        shell: bash
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
       - uses: gradle/actions/setup-gradle@v4
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -66,14 +66,16 @@ jobs:
           key: android-arm64-${{ env.ANDROID_NDK_VERSION }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'extern/aurora/cmake/AuroraDependencyVersions.cmake') }}
       - run: ./android/build-apk.sh arm64-v8a 2>&1 | tee android-build.log
         shell: bash
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: foxhollow-android-arm64-debug
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - if: failure()
+        run: python3 android/report-ci-failure.py
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: android-test-reports
@@ -81,4 +83,5 @@ jobs:
             android/app/build/reports
             android/app/build/test-results
             android-build.log
+            android-sdk.log
             build-android-arm64/CMakeFiles/CMakeConfigureLog.yaml
