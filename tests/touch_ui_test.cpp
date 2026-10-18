@@ -2,7 +2,7 @@
 #include "foxhollow_cutscene.h"
 #include "foxhollow_quit.h"
 #include "../port/src/foxhollow_touch_model.hpp"
-#include "../extern/aurora/lib/input/imgui_touch.hpp"
+#include "../extern/aurora/lib/input/imgui_input.hpp"
 #include <imgui_internal.h>
 #include <nlohmann/json.hpp>
 #include <cassert>
@@ -18,8 +18,11 @@ std::unordered_map<std::string, ImRect> items;
 aurora::imgui::TouchPointer pointer;
 int currentSlot = 0;
 int clears = 0;
+bool routed = false;
 }
+namespace aurora::imgui { void process_event(const SDL_Event&) noexcept {} }
 extern "C" {
+Uint64 SDL_GetTicksNS(void) { static Uint64 tick = 0; return ++tick; }
 int16_t gObjSeqSlotSeqIdTable[0x58]{};
 int8_t gObjSeqSlotResults[0x58]{};
 int8_t gObjSeqSlotPrevResults[0x58]{};
@@ -41,6 +44,7 @@ void frame() {
   for (int pass = 0; pass < 8; ++pass) {
     items.clear();
     rectangles.clear();
+    aurora::input::reconcile();
     ImGui::NewFrame();
     fhTouchDraw();
     ImGui::Render();
@@ -57,11 +61,24 @@ bool touch(Uint32 type, ImVec2 pos, SDL_FingerID finger = 42, SDL_TouchID device
   event.type = type;
   event.tfinger.touchID = device;
   event.tfinger.fingerID = finger;
-  return pointer.handle(event, pos);
+  if (!routed) return pointer.handle(event, pos);
+  using namespace aurora::input;
+  using Phase = InputEvent::PointerChanged::Phase;
+  Phase phase = Phase::Move;
+  if (type == SDL_EVENT_FINGER_DOWN) phase = Phase::Down;
+  if (type == SDL_EVENT_FINGER_UP) phase = Phase::Up;
+  if (type == SDL_EVENT_FINGER_CANCELED) phase = Phase::Cancel;
+  InputEvent input;
+  input.source = touch_source();
+  input.payload = InputEvent::PointerChanged{.pointer = static_cast<uint64_t>(finger), .phase = phase,
+                                            .position = {pos.x, pos.y}};
+  detail::dispatch(input, &event);
+  return true;
 }
 void click(const char* name) {
   ImVec2 pos = center(name);
   assert(touch(SDL_EVENT_FINGER_DOWN, pos)); frame();
+  if (routed) for (int i = 0; i < 5; ++i) frame();
   assert(touch(SDL_EVENT_FINGER_UP, pos)); frame(); frame();
 }
 void edit() {
@@ -85,7 +102,7 @@ nlohmann::json load(const std::filesystem::path& path) {
 }
 }
 
-int main() {
+int main(int argc, char**) {
   ImGui::CreateContext();
   ImGui::GetCurrentContext()->TestEngineHookItems = true;
   auto& io = ImGui::GetIO();
@@ -123,9 +140,26 @@ int main() {
   pointer.reset(); frame(); frame();
   assert(!io.MouseDown[0] && !fhTouchMenuOpen());
 
+  routed = argc > 1;
+  if (routed) {
+    using namespace aurora::input;
+    detail::reset();
+    auto layer = register_layer({.label = "aurora.imgui", .priority = kImGuiLayerPriority,
+                                 .onEvent = aurora::imgui::input_layer_event,
+                                 .capturesSource = aurora::imgui::input_layer_captures,
+                                 .userdata = &pointer});
+    assert(layer != kInvalidLayerId);
+    pos = center("Menu");
+    assert(touch(SDL_EVENT_FINGER_DOWN, pos)); frame(); frame();
+    assert(io.MouseDown[0] && !fhTouchMenuOpen());
+    detail::focus_lost(); frame(); frame();
+    assert(!io.MouseDown[0] && !fhTouchMenuOpen());
+    touch(SDL_EVENT_FINGER_UP, pos); frame();
+  }
   for (ImVec2 size : {ImVec2(640, 480), ImVec2(800, 480), ImVec2(2400, 1080), ImVec2(960, 540)}) {
     io.DisplaySize = size; frame(); frame(); frame();
     click("Menu");
+    assert(fhTouchMenuOpen());
     for (const char* label : {"Edit controls", "Save controls", "Cancel"}) {
       auto rect = items.at(label);
       assert(rect.Min.x >= 0 && rect.Min.y >= 0 && rect.Max.x <= size.x && rect.Max.y <= size.y);

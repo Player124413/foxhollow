@@ -23,7 +23,8 @@ add_library(imgui_test STATIC
 target_include_directories(imgui_test PUBLIC ${imgui_SOURCE_DIR})
 target_compile_definitions(imgui_test PUBLIC IMGUI_ENABLE_TEST_ENGINE)
 add_executable(touch_ui_test touch_ui_test.cpp ../port/src/foxhollow_touch.cpp
-    ../port/src/foxhollow_cutscene.c ../port/src/foxhollow_quit.c)
+    ../port/src/foxhollow_cutscene.c ../port/src/foxhollow_quit.c
+    ../extern/aurora/lib/input/router.cpp ../extern/aurora/lib/input/source_state.cpp)
 target_compile_definitions(touch_ui_test PRIVATE TARGET_PC)
 target_include_directories(touch_ui_test PRIVATE ../port/include
     ../extern/aurora/include ${sdl_SOURCE_DIR}/include ${json_SOURCE_DIR}/include)
@@ -88,3 +89,5 @@ add_test(NAME cutscene_native_syntax COMMAND ${CMAKE_C_COMPILER}
     ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/engine/52_n_attractmode/n_attractmode.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/engine/2/2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../port/src/vi_shim.c)
+
+add_test(NAME touch_ui_router_test COMMAND touch_ui_test routed)
