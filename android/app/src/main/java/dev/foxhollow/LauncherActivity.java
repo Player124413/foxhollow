@@ -25,6 +25,22 @@ public final class LauncherActivity extends Activity {
     private volatile boolean cancelImport;
     private boolean importing;
     private Settings settings;
+    private boolean checkingUpdates;
+
+    @Override
+    protected void attachBaseContext(android.content.Context base) {
+        android.content.res.Configuration config = new android.content.res.Configuration(base.getResources().getConfiguration());
+        config.setLocale(new java.util.Locale(languageIndex(base) == 1 ? "ru" : "en"));
+        super.attachBaseContext(base.createConfigurationContext(config));
+    }
+
+    private static int languageIndex(android.content.Context context) {
+        try {
+            return context.getSharedPreferences("launcher", MODE_PRIVATE).getInt("language", 0) == 1 ? 1 : 0;
+        } catch (ClassCastException exception) {
+            return 0;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -38,6 +54,11 @@ public final class LauncherActivity extends Activity {
             }
         });
         showLauncher();
+        String noticeKey = "notice_" + languageIndex(this);
+        if (!getSharedPreferences("launcher", MODE_PRIVATE).getBoolean(noticeKey, false)) {
+            showCommunity();
+            getSharedPreferences("launcher", MODE_PRIVATE).edit().putBoolean(noticeKey, true).apply();
+        }
     }
 
     private void showLauncher() {
@@ -52,6 +73,19 @@ public final class LauncherActivity extends Activity {
             });
             content.requestApplyInsets();
         }
+        Spinner language = findViewById(R.id.language);
+        language.setSelection(languageIndex(this));
+        language.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position != languageIndex(LauncherActivity.this) && !importing) {
+                    getSharedPreferences("launcher", MODE_PRIVATE).edit().putInt("language", position).apply();
+                    recreate();
+                }
+            }
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        findViewById(R.id.about).setOnClickListener(view -> showCommunity());
+        findViewById(R.id.check_updates).setOnClickListener(view -> checkUpdates());
         findViewById(R.id.play).setOnClickListener(view -> {
             if (new File(getFilesDir(), "disc.img").isFile()) {
                 view.setEnabled(false);
@@ -91,6 +125,88 @@ public final class LauncherActivity extends Activity {
             if (!deleteChildren(getCacheDir())) error(getString(R.string.io_error));
         }));
         updateStatus();
+    }
+
+    private void openLink(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (android.content.ActivityNotFoundException exception) {
+            error(getString(R.string.link_error));
+        }
+    }
+
+    private void showCommunity() {
+        new AlertDialog.Builder(this).setTitle(R.string.about).setMessage(R.string.community_message)
+            .setPositiveButton(R.string.telegram, (dialog, which) -> openLink("https://t.me/player1444ports"))
+            .setNeutralButton(R.string.upstream, (dialog, which) -> openLink("https://github.com/JackPriceBurns/foxhollow"))
+            .setNegativeButton(R.string.close, null).show();
+    }
+
+    private void checkUpdates() {
+        if (checkingUpdates || importing) return;
+        checkingUpdates = true;
+        updateStatus();
+        worker.execute(() -> {
+            String tag = null;
+            String releaseUrl = null;
+            int result = R.string.updates_error;
+            javax.net.ssl.HttpsURLConnection connection = null;
+            try {
+                connection = (javax.net.ssl.HttpsURLConnection)new java.net.URL(
+                    "https://api.github.com/repos/Player124413/foxhollow/releases/latest").openConnection();
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                connection.setRequestProperty("Accept", "application/vnd.github+json");
+                connection.setRequestProperty("User-Agent", "Foxhollow-Android");
+                connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+                int status = connection.getResponseCode();
+                if (status == 404) {
+                    result = R.string.no_releases;
+                } else if (status == 200) {
+                    try (InputStream input = connection.getInputStream();
+                         java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
+                        byte[] buffer = new byte[8192];
+                        int length;
+                        while ((length = input.read(buffer)) != -1) {
+                            if (Thread.currentThread().isInterrupted() || output.size() + length > 2 * 1024 * 1024)
+                                throw new java.io.IOException();
+                            output.write(buffer, 0, length);
+                        }
+                        org.json.JSONObject release = new org.json.JSONObject(output.toString("UTF-8"));
+                        String candidate = release.getString("html_url");
+                        if (!candidate.startsWith("https://github.com/Player124413/foxhollow/releases/tag/"))
+                            throw new java.io.IOException();
+                        tag = release.getString("tag_name");
+                        releaseUrl = candidate;
+                        result = R.string.latest_release;
+                    }
+                }
+            } catch (Exception exception) {
+                result = R.string.updates_error;
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+            final int messageId = result;
+            final String version = tag;
+            final String url = releaseUrl;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                checkingUpdates = false;
+                updateStatus();
+                String message = getString(messageId);
+                if (messageId == R.string.latest_release) {
+                    String installed;
+                    try { installed = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+                    catch (android.content.pm.PackageManager.NameNotFoundException exception) { installed = "?"; }
+                    message = version.replaceFirst("^v", "").equals(installed)
+                        ? getString(R.string.up_to_date, version) : getString(messageId, version, installed);
+                }
+                AlertDialog.Builder dialog = new AlertDialog.Builder(this).setTitle(R.string.check_updates)
+                    .setMessage(message).setNegativeButton(R.string.close, null);
+                if (url != null) dialog.setPositiveButton(R.string.open_release, (window, which) -> openLink(url));
+                dialog.show();
+            });
+        });
     }
 
     private void bindSpinner(int id, String key, int count, int fallback) {
@@ -139,6 +255,9 @@ public final class LauncherActivity extends Activity {
 
     private void updateStatus() {
         File disc = new File(getFilesDir(), "disc.img");
+        findViewById(R.id.language).setEnabled(!importing);
+        findViewById(R.id.check_updates).setEnabled(!importing && !checkingUpdates);
+        ((TextView)findViewById(R.id.check_updates)).setText(checkingUpdates ? R.string.checking_updates : R.string.check_updates);
         findViewById(R.id.play).setEnabled(!importing && disc.isFile());
         findViewById(R.id.import_disc).setEnabled(!importing);
         findViewById(R.id.import_progress).setVisibility(importing ? View.VISIBLE : View.GONE);

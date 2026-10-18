@@ -80,6 +80,20 @@ public final class LauncherTest {
         assertTrue(intent.getBooleanExtra("touch", false));
     }
 
+    @Test public void localizedLauncherResources() {
+        for (String language : new String[] {"en", "ru"}) {
+            android.content.res.Configuration config = new android.content.res.Configuration(context.getResources().getConfiguration());
+            config.setLocale(new java.util.Locale(language));
+            Context localized = context.createConfigurationContext(config);
+            assertEquals(language.equals("ru") ? "Проверить обновления" : "Check for updates",
+                localized.getString(R.string.check_updates));
+            String message = localized.getString(R.string.community_message);
+            assertTrue(message.contains("https://t.me/player1444ports"));
+            assertTrue(message.contains("https://github.com/JackPriceBurns/foxhollow"));
+            assertTrue(message.contains(language.equals("ru") ? "порт бы не вышел" : "would not have been possible"));
+        }
+    }
+
     @Test public void launcherBindsSettings() {
         try (ActivityScenario<LauncherActivity> scenario = ActivityScenario.launch(LauncherActivity.class)) {
             scenario.onActivity(activity -> {

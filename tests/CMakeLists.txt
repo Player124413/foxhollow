@@ -96,3 +96,5 @@ add_test(NAME cutscene_native_syntax COMMAND ${CMAKE_C_COMPILER}
     ${CMAKE_CURRENT_SOURCE_DIR}/../game/src/dlls/objects/488_SB_Galleon/SB_Galleon.c)
 
 add_test(NAME touch_ui_router_test COMMAND touch_ui_test routed)
+
+add_test(NAME launcher_resources COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_launcher_resources.py)

@@ -5,6 +5,13 @@
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="@string/app_name" android:textSize="38sp" android:textStyle="bold" android:textColor="#FFFFFF" />
         <TextView style="@style/Label" android:text="@string/subtitle" />
+        <TextView style="@style/Label" android:text="@string/language" android:labelFor="@id/language" />
+        <Spinner android:id="@+id/language" android:layout_width="match_parent" android:layout_height="48dp"
+            android:entries="@array/language_labels" />
+        <Button android:id="@+id/check_updates" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/check_updates" />
+        <Button android:id="@+id/about" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/about" />
         <TextView android:id="@+id/disc_status" style="@style/Label" android:accessibilityLiveRegion="polite" />
         <Button android:id="@+id/play" android:layout_width="match_parent" android:layout_height="64dp"
             android:layout_marginTop="20dp" android:text="@string/play" />

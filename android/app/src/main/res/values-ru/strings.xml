@@ -1,0 +1,58 @@
+<resources>
+  <string name="app_name">Foxhollow</string>
+  <string name="subtitle">STAR FOX ADVENTURES · ANDROID</string>
+  <string name="play">Играть</string>
+  <string name="import_disc">Выбрать / заменить образ игры</string>
+  <string name="disc_missing">Образ не выбран</string>
+  <string name="disc_ready">Образ готов · %1$s</string>
+  <string name="import_progress">Импорт: %1$d МиБ</string>
+  <string name="import_error">Не удалось импортировать образ. Проверьте формат файла и свободное место.\n%1$s</string>
+  <string name="graphics">Графика</string>
+  <string name="renderer">Графический API</string>
+  <string name="resolution">Масштаб рендера</string>
+  <string name="aspect">Соотношение сторон</string>
+  <string name="fps">Счётчик FPS</string>
+  <string name="vsync">Вертикальная синхронизация</string>
+  <string name="volume">Громкость: %1$d%%</string>
+  <string name="sound">Звук и управление</string>
+  <string name="touch">Сенсорное управление</string>
+  <string name="touch_editor">Открыть редактор управления при запуске</string>
+  <string name="touch_reset">Сбросить раскладку управления</string>
+  <string name="keep_screen_on">Не выключать экран во время игры</string>
+  <string name="cache_clear">Очистить кэш шейдеров</string>
+  <string name="settings_reset">Сбросить настройки</string>
+  <string name="confirm">Подтвердить?</string>
+  <string name="io_error">Ошибка доступа к файлам</string>
+  <string name="import_cancel">Отмена</string>
+  <string name="legal">Для игры нужен ваш собственный легально полученный образ Star Fox Adventures: ISO, RVZ или WIA. Игровые данные не входят в APK.</string>
+  <string name="performance_note">Целевой лимит — 60 кадров/с. При нехватке производительности уменьшите масштаб рендера. Изменения применяются при следующем запуске.</string>
+  <string name="renderer_opengles">OpenGL ES</string>
+  <string-array name="scale_labels">
+    <item>0.75× · экономичный</item>
+    <item>1× · стандартный</item>
+    <item>1.5×</item>
+    <item>2× · высокое качество</item>
+  </string-array>
+  <string-array name="aspect_labels">
+    <item>4:3 · оригинал</item>
+    <item>16:9 · широкий экран</item>
+  </string-array>
+  <string name="language">Язык</string>
+  <string name="check_updates">Проверить обновления</string>
+  <string name="checking_updates">Проверяем релизы на GitHub…</string>
+  <string name="updates_error">Не удалось проверить обновления. Проверьте подключение и попробуйте снова.</string>
+  <string name="no_releases">Опубликованных релизов пока нет. APK из сборок Actions — это не релизы GitHub.</string>
+  <string name="latest_release">Последний релиз: %1$s\nУстановленная версия: %2$s</string>
+  <string name="up_to_date">У вас последний релиз (%1$s).</string>
+  <string name="open_release">Открыть релиз</string>
+  <string name="about">Сообщество и благодарности</string>
+  <string name="community_message">Мой Telegram-канал: https://t.me/player1444ports\n\nБез этого репозитория порт бы не вышел:\nhttps://github.com/JackPriceBurns/foxhollow</string>
+  <string name="telegram">Telegram-канал</string>
+  <string name="upstream">Исходный репозиторий</string>
+  <string name="close">Закрыть</string>
+  <string name="link_error">Нет приложения для открытия этой ссылки.</string>
+  <string-array name="language_labels">
+    <item>English</item>
+    <item>Русский</item>
+  </string-array>
+</resources>

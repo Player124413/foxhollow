@@ -288,12 +288,6 @@ extern "C" void fhTouchDraw(void) {
     ImGui::SetNextWindowPos(ImVec2(size.x * .55f, size.y - 12 * scale), ImGuiCond_Always, ImVec2(.5f, 1));
     ImGui::Begin("Touch toolbar", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize);
     if (ImGui::Button("Menu", ImVec2(104 * scale, 44 * scale))) openMenu();
-    if (fhCanSkipCutscene()) {
-      ImGui::SameLine();
-      if (ImGui::Button("Skip scene", ImVec2(148 * scale, 44 * scale))) {
-        if (fhSkipCutscene()) release();
-      }
-    }
     const auto pos = ImGui::GetWindowPos();
     const auto bounds = ImGui::GetWindowSize();
     hudBounds = {pos.x / size.x, pos.y / size.y, (pos.x + bounds.x) / size.x, (pos.y + bounds.y) / size.y};
