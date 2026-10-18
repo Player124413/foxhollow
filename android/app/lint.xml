@@ -3,4 +3,10 @@
         <ignore path="**/org/libsdl/app/HIDDeviceBLESteamController.java" />
         <ignore path="**/org/libsdl/app/HIDDeviceManager.java" />
     </issue>
+    <issue id="NewApi">
+        <ignore path="**/org/libsdl/app/SDLControllerManager.java" />
+    </issue>
+    <issue id="UnspecifiedRegisterReceiverFlag">
+        <ignore path="**/org/libsdl/app/HIDDeviceManager.java" />
+    </issue>
 </lint>
