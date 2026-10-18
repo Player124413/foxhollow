@@ -5315,6 +5315,7 @@ int ObjSeq_update(GameObject* obj, f32 t)
         else if ((s8)gObjSeqSlotPrevResults[state->slot] == 2)
         {
             state->curFrame = state->endFrame;
+            state->pendingConditionId = 0;
             gObjSeqSkippingToEnd = 1;
         }
         else if ((s8)gObjSeqSlotPrevResults[state->slot] == 3)
@@ -5504,7 +5505,7 @@ int ObjSeq_update(GameObject* obj, f32 t)
             }
         }
 
-        for (k = 0; k < 10; k++)
+        for (k = 0; k < 10 && gObjSeqSkippingToEnd == 0; k++)
         {
             conditionOpcode = state->conditionOpcodes[k];
             if (conditionOpcode == 0)
@@ -5573,7 +5574,7 @@ int ObjSeq_update(GameObject* obj, f32 t)
         for (k = 0; k < gObjSeqPendingCmd0BCount; k++)
         {
             entry = &lbl_8039944C[k];
-            if (seqDoSubCmd0B(obj, activeObj, (u8*)seq, entry->cmd, entry->frame, entry->reps, 0, 0) != 0)
+            if (seqDoSubCmd0B(obj, activeObj, (u8*)seq, entry->cmd, entry->frame, entry->reps, 0, gObjSeqSkippingToEnd) != 0)
             {
                 k = gObjSeqPendingCmd0BCount;
             }
