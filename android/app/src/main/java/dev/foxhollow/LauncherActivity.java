@@ -199,7 +199,7 @@ public final class LauncherActivity extends Activity {
                     try { installed = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
                     catch (android.content.pm.PackageManager.NameNotFoundException exception) { installed = "?"; }
                     message = version.replaceFirst("^v", "").equals(installed)
-                        ? getString(R.string.up_to_date, version) : getString(messageId, version, installed);
+                        ? getString(R.string.up_to_date, version) : getString(R.string.latest_release, version, installed);
                 }
                 AlertDialog.Builder dialog = new AlertDialog.Builder(this).setTitle(R.string.check_updates)
                     .setMessage(message).setNegativeButton(R.string.close, null);
