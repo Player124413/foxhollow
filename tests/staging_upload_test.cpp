@@ -11,6 +11,19 @@
 using namespace aurora::gfx;
 
 int main() {
+  for (bool texture : {false, true}) {
+    for (bool deferred : {false, true}) {
+      for (bool task : {false, true}) {
+        for (bool custom : {false, true}) {
+          for (bool rmlui : {false, true}) {
+            const bool batched = can_batch_shared_uploads(deferred, task, custom);
+            assert(can_use_texture_only_uploads(texture, batched, rmlui) ==
+                   (texture && deferred && !task && !custom && !rmlui));
+          }
+        }
+      }
+    }
+  }
   assert(can_batch_shared_uploads(true, false, false));
   assert(!can_batch_shared_uploads(false, false, false));
   assert(!can_batch_shared_uploads(true, true, false));

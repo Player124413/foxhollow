@@ -121,8 +121,14 @@ int main(int argc, char** argv) {
   replace_all(shader, "{13}", std::string(aurora::gx::vertex_float_fast_path(true, 3)));
   replace_all(shader, "{14}", std::string(aurora::gx::vertex_float_fast_path(true, 4)));
   replace_all(shader, "{15}", std::string(aurora::gx::vertex_float_fast_path(true, 2)));
-  replace_all(shader, "{16}", std::string(aurora::gx::vertex_short_fast_path(true, 2)));
+  replace_all(shader, "{16}", std::string(aurora::gx::vertex_short_pair_source(true)));
   replace_all(shader, "{17}", std::string(aurora::gx::vertex_short_fast_path(true, 3)));
+  const auto pairStart = shader.find("fn raw_fetch_u16_2(");
+  const auto pairEnd = shader.find("fn raw_fetch_u16_3(", pairStart);
+  const auto pairBody = shader.substr(pairStart, pairEnd - pairStart);
+  const auto firstReturn = pairBody.find("return ");
+  assert(firstReturn != std::string::npos);
+  assert(pairBody.find("return ", firstReturn + 1) == std::string::npos);
   shader += R"(
 @group(0) @binding(0) var<storage, read> vbuf: array<u32>;
 @group(0) @binding(1) var<storage, read> abuf: array<u32>;
@@ -151,7 +157,7 @@ int main(int argc, char** argv) {
   assert(shader.find("texel_idx % dims.x") == std::string::npos);
   assert(shader.find("texel_idx / dims.x") == std::string::npos);
   assert(aurora::gx::vertex_float_fast_path(false, 2).empty());
-  assert(aurora::gx::vertex_short_fast_path(false, 2).empty());
+  assert(aurora::gx::vertex_short_pair_source(false).find("load_u16") != std::string_view::npos);
   assert(aurora::gx::vertex_short_fast_path(false, 3).empty());
   assert(aurora::gx::vertex_float_fast_path(false, 3).empty());
   assert(aurora::gx::vertex_float_fast_path(false, 4).empty());

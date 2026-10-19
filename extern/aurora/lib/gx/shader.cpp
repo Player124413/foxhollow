@@ -1671,10 +1671,6 @@ fn raw_fetch_u16_1(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> u32 
 }}
 
 fn raw_fetch_u16_2(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec2u {{{16}
-  return vec2u(
-    load_u16(p, byte_off + 0u, le),
-    load_u16(p, byte_off + 2u, le),
-  );
 }}
 
 fn raw_fetch_u16_3(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec3u {{{17}
@@ -1925,7 +1921,7 @@ fn fs_main(in: VertexOutput) -> {10} {{{6}{5}{11}
                   vertex_float_fast_path(webgpu::g_textureVertexFetch, 3),
                   vertex_float_fast_path(webgpu::g_textureVertexFetch, 4),
                   vertex_float_fast_path(webgpu::g_textureVertexFetch, 2),
-                  vertex_short_fast_path(webgpu::g_textureVertexFetch, 2),
+                  vertex_short_pair_source(webgpu::g_textureVertexFetch),
                   vertex_short_fast_path(webgpu::g_textureVertexFetch, 3));
   if (webgpu::g_textureVertexFetch) {
     use_texture_vertex_fetch(shaderSource);

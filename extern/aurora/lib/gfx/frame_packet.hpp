@@ -206,6 +206,7 @@ struct FramePacket {
   size_t stagingBuffer = 0;
   StagingHighWater copied;
   bool deferEncoding = false;
+  bool textureOnlyUploads = false;
   AuroraStats stats{};
 };
 

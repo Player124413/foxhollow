@@ -20,6 +20,10 @@ constexpr bool can_batch_shared_uploads(bool deferred, bool hasEncoderTask, bool
   return deferred && !hasEncoderTask && !hasCustomDraw;
 }
 
+constexpr bool can_use_texture_only_uploads(bool textureFetch, bool batched, bool rmlui) {
+  return textureFetch && batched && !rmlui;
+}
+
 constexpr uint64_t staging_upload_size(uint64_t size) {
   return (size + 3u) & ~uint64_t{3};
 }

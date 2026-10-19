@@ -100,14 +100,20 @@ inline std::string_view vertex_float_fast_path(bool textureFetch, unsigned compo
 )";
 }
 
-inline std::string_view vertex_short_fast_path(bool textureFetch, unsigned components) {
-  if (!textureFetch) return {};
-  if (components == 2) {
+inline std::string_view vertex_short_pair_source(bool textureFetch) {
+  if (textureFetch) {
     return R"(
   let packed = load_u32_raw(p, byte_off);
   return vec2u(bswap16(packed & 65535u, le), bswap16(packed >> 16u, le));
 )";
   }
+  return R"(
+  return vec2u(load_u16(p, byte_off, le), load_u16(p, byte_off + 2u, le));
+)";
+}
+
+inline std::string_view vertex_short_fast_path(bool textureFetch, unsigned components) {
+  if (!textureFetch || components != 3) return {};
   return R"(
   if ((byte_off & 1u) == 0u) {
     let words = load_words2(p, byte_off >> 2u);

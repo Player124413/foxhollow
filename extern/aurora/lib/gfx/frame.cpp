@@ -759,14 +759,14 @@ void end_frame(EndFrameCallback callback) {
       lastPerformanceLog = submitEnd;
       Log.info("Performance: present_ms={:.2f} record_ms={:.2f} submit_ms={:.2f} draws={} merged={} "
                "vertex_bytes={} storage_bytes={} texture_upload_bytes={} vertex_path={} uniform_bytes={} "
-               "upload_ms={:.2f} staging={} batched={} ops={} encode_ms={:.2f} "
+               "upload_ms={:.2f} staging={} batched={} texture_only_uploads={} ops={} encode_ms={:.2f} "
                "acquire_ms={:.2f} finish_ms={:.2f} queue_submit_ms={:.2f} present_call_ms={:.2f}",
                static_cast<double>(g_presentPeriodNs.load(std::memory_order_acquire)) / 1'000'000.0,
                static_cast<double>(g_cpuFrameTimeNs.load(std::memory_order_acquire)) / 1'000'000.0,
                std::chrono::duration<double, std::milli>(submitEnd - submitStart).count(),
                stats.drawCallCount, stats.mergedDrawCallCount, stats.lastVertSize, stats.lastStorageSize,
                stats.lastTextureUploadSize, webgpu::g_textureVertexFetch ? "texture" : "storage",
-               stats.lastUniformSize, uploadMs, g_queueStaging ? "queue" : "mapped", batched, opCount, encodeMs,
+               stats.lastUniformSize, uploadMs, g_queueStaging ? "queue" : "mapped", batched, packet.textureOnlyUploads, opCount, encodeMs,
                g_resources.timings.acquireMs, g_resources.timings.finishMs,
                g_resources.timings.submitMs, g_resources.timings.presentMs);
     }

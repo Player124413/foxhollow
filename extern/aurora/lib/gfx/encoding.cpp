@@ -390,7 +390,8 @@ bool needs_staging_copy(const FramePacket& frame, const FrameOp& op) {
   return false;
 }
 
-void copy_shared_staging(wgpu::CommandEncoder& cmd, FramePacket& frame, const StagingHighWater& highWater) {
+void copy_shared_staging(wgpu::CommandEncoder& cmd, FramePacket& frame, const StagingHighWater& highWater,
+                         bool mirrorVertexBuffers = true) {
   auto& res = resources();
   if (webgpu::g_textureVertexFetch) {
     copy_staging_texture_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset,
@@ -398,12 +399,17 @@ void copy_shared_staging(wgpu::CommandEncoder& cmd, FramePacket& frame, const St
     copy_staging_texture_range(cmd, frame, frame.copied.storage, highWater.storage, StorageStagingOffset,
                                res.storageDataTexture);
   }
-  copy_staging_buffer_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset, res.vertexBuffer);
+  if (mirrorVertexBuffers) {
+    copy_staging_buffer_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset, res.vertexBuffer);
+    copy_staging_buffer_range(cmd, frame, frame.copied.storage, highWater.storage, StorageStagingOffset,
+                              res.storageBuffer);
+  } else {
+    frame.copied.verts = highWater.verts;
+    frame.copied.storage = highWater.storage;
+  }
   copy_staging_buffer_range(cmd, frame, frame.copied.uniforms, highWater.uniforms, UniformStagingOffset,
                             res.uniformBuffer);
   copy_staging_buffer_range(cmd, frame, frame.copied.indices, highWater.indices, IndexStagingOffset, res.indexBuffer);
-  copy_staging_buffer_range(cmd, frame, frame.copied.storage, highWater.storage, StorageStagingOffset,
-                            res.storageBuffer);
 }
 
 void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op) {
@@ -436,6 +442,7 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
 
 namespace detail {
 bool encode_deferred_frame(wgpu::CommandEncoder& cmd, FramePacket& frame) {
+  frame.textureOnlyUploads = false;
   if (!frame.deferEncoding) {
     return false;
   }
@@ -457,7 +464,14 @@ bool encode_deferred_frame(wgpu::CommandEncoder& cmd, FramePacket& frame) {
         .indices = static_cast<uint32_t>(frame.indices.size()),
         .storage = static_cast<uint32_t>(frame.storage.size()),
     };
-    copy_shared_staging(cmd, frame, highWater);
+#ifdef AURORA_ENABLE_RMLUI
+    constexpr bool rmlui = true;
+#else
+    constexpr bool rmlui = false;
+#endif
+    const bool textureOnly = can_use_texture_only_uploads(webgpu::g_textureVertexFetch, batched, rmlui);
+    copy_shared_staging(cmd, frame, highWater, !textureOnly);
+    frame.textureOnlyUploads = textureOnly;
   }
   for (const auto& op : frame.ops) {
     encode_op(cmd, frame, op);
