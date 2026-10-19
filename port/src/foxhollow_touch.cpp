@@ -15,6 +15,11 @@
 
 namespace {
 auto controls = fh::touch::defaults;
+auto menuControl = fh::touch::defaultMenu;
+auto previousMenu = menuControl;
+fh::touch::Control& editableControl(int index) {
+  return index == static_cast<int>(controls.size()) ? menuControl : controls[index];
+}
 bool editing = false;
 bool menuOpen = false;
 bool quitPrompt = false;
@@ -35,12 +40,14 @@ auto previousControls = controls;
 float previousOpacity = opacity, previousDeadzone = deadzone;
 void snapshot() {
   previousControls = controls;
+  previousMenu = menuControl;
   previousOpacity = opacity;
   previousDeadzone = deadzone;
 }
 
 bool save() {
   nlohmann::json data;
+  data["menu"] = {menuControl.x, menuControl.y, menuControl.radius};
   data["opacity"] = opacity;
   data["deadzone"] = deadzone;
   data["controls"] = nlohmann::json::array();
@@ -79,6 +86,16 @@ extern "C" void fhTouchInit(const char* userPath) {
     float a = data.at("opacity").get<float>();
     float d = data.at("deadzone").get<float>();
     if (!std::isfinite(a) || !std::isfinite(d)) return;
+    auto loadedMenu = fh::touch::defaultMenu;
+    if (data.contains("menu")) {
+      auto& menu = data.at("menu");
+      if (menu.size() != 3) return;
+      loadedMenu.x = menu.at(0).get<float>();
+      loadedMenu.y = menu.at(1).get<float>();
+      loadedMenu.radius = menu.at(2).get<float>();
+      if (!fh::touch::valid(loadedMenu.x, loadedMenu.y, loadedMenu.radius)) return;
+    }
+    menuControl = loadedMenu;
     controls = loaded;
     opacity = std::clamp(a, .1f, 1.f);
     deadzone = std::clamp(d, 0.f, .5f);
@@ -136,7 +153,7 @@ extern "C" void fhTouchUpdate(void) {
       }
       contacts[contactCount++] = {devices[d], finger.id, selected};
       if (selected < 0) continue;
-      auto& c = controls[selected];
+      auto& c = editableControl(selected);
       if (selected < 2) {
         if (!releaseGuard) thumbTargets[selected] = ImVec2((finger.x - c.x) * w / (c.radius * unit),
                                                          (finger.y - c.y) * h / (c.radius * unit));
@@ -172,6 +189,7 @@ void release() {
 }
 void cancel() {
   controls = previousControls;
+  menuControl = previousMenu;
   opacity = previousOpacity;
   deadzone = previousDeadzone;
   menuOpen = editing = false;
@@ -285,13 +303,17 @@ extern "C" void fhTouchDraw(void) {
   }
   hudBounds = {};
   if (!fhTouchMenuOpen()) {
-    ImGui::SetNextWindowPos(ImVec2(size.x * .55f, size.y - 12 * scale), ImGuiCond_Always, ImVec2(.5f, 1));
+    fh::touch::constrainMenu(menuControl, size.x, size.y);
+    auto extent = fh::touch::menuSize(menuControl, size.x, size.y);
+    ImGui::SetNextWindowPos(ImVec2(size.x * menuControl.x, size.y * menuControl.y), ImGuiCond_Always, ImVec2(.5f, .5f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin("Touch toolbar", nullptr, panelFlags | ImGuiWindowFlags_AlwaysAutoResize);
-    if (ImGui::Button("Menu", ImVec2(104 * scale, 44 * scale))) openMenu();
+    if (ImGui::Button("Menu", ImVec2(extent[0], extent[1]))) openMenu();
     const auto pos = ImGui::GetWindowPos();
     const auto bounds = ImGui::GetWindowSize();
     hudBounds = {pos.x / size.x, pos.y / size.y, (pos.x + bounds.x) / size.x, (pos.y + bounds.y) / size.y};
     ImGui::End();
+    ImGui::PopStyleVar();
   }
   if (editing) {
     float panelWidth = std::min(320 * scale, size.x * .44f);
@@ -320,18 +342,33 @@ extern "C" void fhTouchDraw(void) {
           dragging = true;
         }
       }
+      auto extent = fh::touch::menuSize(menuControl, size.x, size.y);
+      if (std::abs(io.MousePos.x - origin.x - menuControl.x * canvas.x) <= extent[0] * fit / 2 &&
+          std::abs(io.MousePos.y - origin.y - menuControl.y * canvas.y) <= extent[1] * fit / 2) {
+        selected = static_cast<int>(controls.size());
+        dragging = true;
+      }
     }
     if (dragging && ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
-      auto& c = controls[selected];
+      auto& c = editableControl(selected);
       c.x += io.MouseDelta.x / canvas.x;
       c.y += io.MouseDelta.y / canvas.y;
-      fh::touch::constrain(c, size.x / size.y);
+      if (selected == static_cast<int>(controls.size())) fh::touch::constrainMenu(c, size.x, size.y);
+      else fh::touch::constrain(c, size.x / size.y);
     }
     auto* draw = ImGui::GetWindowDrawList();
     ImVec2 corner(origin.x + canvas.x, origin.y + canvas.y);
     draw->AddRectFilled(origin, corner, IM_COL32(18, 30, 46, 255), 8 * scale);
     draw->AddRect(origin, corner, IM_COL32(60, 90, 115, 255), 8 * scale);
     drawControls(draw, origin, canvas, true);
+    auto menuExtent = fh::touch::menuSize(menuControl, size.x, size.y);
+    ImVec2 menuCenter(origin.x + menuControl.x * canvas.x, origin.y + menuControl.y * canvas.y);
+    ImVec2 menuMin(menuCenter.x - menuExtent[0] * fit / 2, menuCenter.y - menuExtent[1] * fit / 2);
+    ImVec2 menuMax(menuCenter.x + menuExtent[0] * fit / 2, menuCenter.y + menuExtent[1] * fit / 2);
+    draw->AddRectFilled(menuMin, menuMax, IM_COL32(35, 68, 95, 240), 6 * scale);
+    draw->AddRect(menuMin, menuMax, selected == static_cast<int>(controls.size()) ? IM_COL32(90, 195, 255, 255) : IM_COL32_WHITE, 6 * scale);
+    auto menuText = ImGui::CalcTextSize("Menu");
+    draw->AddText(ImVec2(menuCenter.x - menuText.x / 2, menuCenter.y - menuText.y / 2), IM_COL32_WHITE, "Menu");
     ImGui::End();
     ImGui::SetNextWindowPos(ImVec2(size.x - panelWidth, 0));
     ImGui::SetNextWindowSize(ImVec2(panelWidth, size.y));
@@ -339,18 +376,21 @@ extern "C" void fhTouchDraw(void) {
     ImGui::TextUnformatted("Edit controls");
     if (ImGui::BeginChild("Layout fields", ImVec2(0, -(saveFailed ? 90 : 60) * scale))) {
       ImGui::SetNextItemWidth(-FLT_MIN);
-      if (ImGui::BeginCombo("##Control", controls[selected].label)) {
+      if (ImGui::BeginCombo("##Control", editableControl(selected).label)) {
         for (size_t i = 0; i < controls.size(); ++i)
           if (ImGui::Selectable(controls[i].label, selected == static_cast<int>(i), 0, ImVec2(0, 32 * scale)))
             selected = static_cast<int>(i);
+        if (ImGui::Selectable("Menu", selected == static_cast<int>(controls.size()), 0, ImVec2(0, 32 * scale)))
+          selected = static_cast<int>(controls.size());
         ImGui::EndCombo();
       }
-      auto& c = controls[selected];
+      auto& c = editableControl(selected);
       percentage("Position X", c.x, 0.f, 1.f);
       percentage("Position Y", c.y, 0.f, 1.f);
       percentage("Size", c.radius, .025f, .20f);
-      fh::touch::constrain(c, size.x / size.y);
-      if (ImGui::Button("Reset selected", ImVec2(-FLT_MIN, 44 * scale))) c = fh::touch::defaults[selected];
+      if (selected == static_cast<int>(controls.size())) fh::touch::constrainMenu(c, size.x, size.y);
+      else fh::touch::constrain(c, size.x / size.y);
+      if (ImGui::Button("Reset selected", ImVec2(-FLT_MIN, 44 * scale))) c = selected == static_cast<int>(controls.size()) ? fh::touch::defaultMenu : fh::touch::defaults[selected];
       if (ImGui::Button("Settings", ImVec2(-FLT_MIN, 44 * scale))) { editing = false; menuOpen = true; }
     }
     ImGui::EndChild();
@@ -373,6 +413,7 @@ extern "C" void fhTouchDraw(void) {
       percentage("Deadzone", deadzone, 0.f, .5f);
       if (ImGui::Button("Reset controls", ImVec2(-FLT_MIN, 44 * scale))) {
         controls = fh::touch::defaults;
+        menuControl = fh::touch::defaultMenu;
         opacity = .45f;
         deadzone = .15f;
       }

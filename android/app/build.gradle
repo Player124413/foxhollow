@@ -15,8 +15,33 @@ ext.borealisAndroid = [
 ]
 apply from: new File(borealis, 'platforms/android/gradle/borealis-application.gradle')
 
+def signingPath = System.getenv('FOXHOLLOW_KEYSTORE_FILE')
+def signingPassword = System.getenv('FOXHOLLOW_KEYSTORE_PASSWORD')
+def buildNumber = System.getenv('FOXHOLLOW_BUILD_NUMBER')
+if (System.getenv('GITHUB_ACTIONS') == 'true' && System.getenv('GITHUB_EVENT_NAME') != 'pull_request' && !signingPath) {
+    throw new GradleException('FOXHOLLOW_ANDROID_SIGNING_BUNDLE_REQUIRED')
+}
+
 android {
-    defaultConfig { testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig {
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        if (buildNumber) versionCode 1000000000 + Integer.parseInt(buildNumber)
+    }
+    if (signingPath) {
+        signingConfigs {
+            persistent {
+                storeFile file(signingPath)
+                storeType 'PKCS12'
+                storePassword signingPassword
+                keyAlias System.getenv('FOXHOLLOW_KEYSTORE_ALIAS') ?: 'foxhollow'
+                keyPassword signingPassword
+            }
+        }
+        buildTypes {
+            debug { signingConfig signingConfigs.persistent }
+            release { signingConfig signingConfigs.persistent }
+        }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8

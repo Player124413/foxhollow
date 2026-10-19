@@ -96,6 +96,16 @@ void dragA() {
   assert(touch(SDL_EVENT_FINGER_MOTION, to)); frame();
   assert(touch(SDL_EVENT_FINGER_UP, to)); frame(); frame();
 }
+void dragMenu() {
+  const auto canvas = items.at("##layout");
+  const auto size = canvas.GetSize();
+  const auto& menu = fh::touch::defaultMenu;
+  ImVec2 from(canvas.Min.x + menu.x * size.x, canvas.Min.y + menu.y * size.y);
+  ImVec2 to(from.x - size.x * .12f, from.y - size.y * .12f);
+  assert(touch(SDL_EVENT_FINGER_DOWN, from)); frame();
+  assert(touch(SDL_EVENT_FINGER_MOTION, to)); frame();
+  assert(touch(SDL_EVENT_FINGER_UP, to)); frame(); frame();
+}
 nlohmann::json load(const std::filesystem::path& path) {
   std::ifstream file(path / "touch.json");
   return nlohmann::json::parse(file);
@@ -196,6 +206,26 @@ int main(int argc, char**) {
   assert(load(path) == changed);
   click("Menu"); click("Save controls");
   assert(load(path) == changed);
+
+  const auto originalMenu = center("Menu");
+  edit(); dragMenu(); click("Cancel");
+  assert(std::abs(center("Menu").x - originalMenu.x) < 1.f);
+  assert(std::abs(center("Menu").y - originalMenu.y) < 1.f);
+  edit(); dragMenu(); click("Save controls");
+  auto moved = load(path);
+  assert(moved["menu"][0].get<float>() < fh::touch::defaultMenu.x - .08f);
+  assert(moved["menu"][1].get<float>() < fh::touch::defaultMenu.y - .08f);
+  const auto movedCenter = center("Menu");
+  fhTouchInit(directory); frame(); frame();
+  assert(std::abs(center("Menu").x - movedCenter.x) < 1.f);
+  assert(std::abs(center("Menu").y - movedCenter.y) < 1.f);
+  click("Menu"); assert(fhTouchMenuOpen()); click("Cancel");
+  auto legacy = moved;
+  legacy.erase("menu");
+  { std::ofstream file(path / "touch.json"); file << legacy.dump(); }
+  fhTouchInit(directory); frame(); frame();
+  assert(std::abs(center("Menu").x - originalMenu.x) < 1.f);
+  assert(std::abs(center("Menu").y - originalMenu.y) < 1.f);
 
   currentSlot = 7;
   gObjSeqSlotSeqIdTable[7] = 123;

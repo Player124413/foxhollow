@@ -12,6 +12,14 @@ int main() {
   }
 
   using namespace fh::touch;
+  for (auto screen : {std::array<float, 2>{640, 480}, {960, 540}, {1080, 1920}, {2400, 1080}}) {
+    auto menu = defaultMenu;
+    menu.x = 0; menu.y = 1; menu.radius = .20f;
+    constrainMenu(menu, screen[0], screen[1]);
+    auto extent = menuSize(menu, screen[0], screen[1]);
+    assert(menu.x * screen[0] >= extent[0] / 2 - .01f);
+    assert(menu.y * screen[1] <= screen[1] - extent[1] / 2 + .01f);
+  }
   Thumb thumb;
   for (int i = 0; i < 60; ++i) thumb.follow(3, 4, 1.f / 60);
   assert(std::hypot(thumb.x, thumb.y) <= 1.00001f);

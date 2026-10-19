@@ -19,6 +19,21 @@ inline constexpr std::array<Control, 14> defaults{{
     {"Up", .39f, .66f, .04f, 8}, {"Down", .39f, .86f, .04f, 4},
     {"Left", .34f, .76f, .04f, 1}, {"Right", .44f, .76f, .04f, 2},
 }};
+inline constexpr Control defaultMenu{"Menu", .55f, .93f, .05f, 0};
+inline std::array<float, 2> menuSize(const Control& control, float width, float height) {
+  const float unit = std::min(width, height);
+  const float scale = std::clamp(unit / 480.f, .75f, 3.f);
+  return {std::max(104.f * scale, 4.f * control.radius * unit),
+          std::max(44.f * scale, 2.f * control.radius * unit)};
+}
+inline void constrainMenu(Control& control, float width, float height) {
+  if (width <= 0 || height <= 0) return;
+  auto extent = menuSize(control, width, height);
+  const float rx = std::min(.5f, extent[0] / (2.f * width));
+  const float ry = std::min(.5f, extent[1] / (2.f * height));
+  control.x = std::clamp(control.x, rx, 1.f - rx);
+  control.y = std::clamp(control.y, ry, 1.f - ry);
+}
 struct Thumb {
   float x = 0, y = 0;
   void follow(float tx, float ty, float dt) {

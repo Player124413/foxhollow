@@ -16,3 +16,5 @@ android/.cxx/
 android/__pycache__/
 
 .venv/
+
+/.android-signing/

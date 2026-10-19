@@ -44,3 +44,9 @@ python3 android/verify-native.py "build-$preset/libmain.so" "$abi" "$bin/llvm-re
 cd android
 ./gradlew --no-daemon -PnativeBuildDir="$root/build-$preset" :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
 "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$root/android/app/build/outputs/apk/debug/app-$abi-debug.apk"
+
+if [[ -n "${FOXHOLLOW_KEYSTORE_FILE:-}" ]]; then
+    apk="$root/android/app/build/outputs/apk/debug/app-$abi-debug.apk"
+    "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$(dirname "$apk")/signing-certificate.txt"
+    python3 "$root/android/verify-signing.py" "$(dirname "$apk")/signing-certificate.txt" "$root/android/signing-certificate.sha256"
+fi
