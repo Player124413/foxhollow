@@ -16,6 +16,10 @@ inline constexpr uint64_t IndexStagingOffset = UniformStagingOffset + UniformBuf
 inline constexpr uint64_t StorageStagingOffset = IndexStagingOffset + IndexBufferSize;
 inline constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBufferSize;
 
+constexpr bool use_queue_staging(bool openGles, bool android, bool textureFetch) {
+  return openGles && (android || textureFetch);
+}
+
 constexpr bool can_batch_shared_uploads(bool deferred, bool hasEncoderTask, bool hasCustomDraw) {
   return deferred && !hasEncoderTask && !hasCustomDraw;
 }

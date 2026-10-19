@@ -11,6 +11,17 @@
 using namespace aurora::gfx;
 
 int main() {
+  for (bool gles : {false, true}) {
+    for (bool android : {false, true}) {
+      for (bool texture : {false, true}) {
+        assert(use_queue_staging(gles, android, texture) == (gles && (android || texture)));
+      }
+    }
+  }
+  assert(use_queue_staging(true, true, false));
+  assert(use_queue_staging(true, true, true));
+  assert(!use_queue_staging(false, true, false));
+  assert(!use_queue_staging(true, false, false));
   for (bool texture : {false, true}) {
     for (bool deferred : {false, true}) {
       for (bool task : {false, true}) {

@@ -395,7 +395,13 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
 }
 
 void initialize() {
-  g_queueStaging = webgpu::g_textureVertexFetch && webgpu::g_backendType == wgpu::BackendType::OpenGLES;
+#ifdef __ANDROID__
+  constexpr bool android = true;
+#else
+  constexpr bool android = false;
+#endif
+  g_queueStaging = use_queue_staging(webgpu::g_backendType == wgpu::BackendType::OpenGLES, android,
+                                     webgpu::g_textureVertexFetch);
   Log.info("Staging upload path: {}", g_queueStaging ? "queue writes" : "mapped buffers");
   g_frameIndex = 0;
   g_processEventsQueued.store(false, std::memory_order_release);
@@ -602,7 +608,14 @@ void shutdown() {
 bool wait_for_staging_buffer(size_t slot) {
   ZoneScopedN("Wait for buffer map");
   map_staging_buffer(slot);
+  const auto waitStart = PresentClock::now();
+  bool reported = false;
   while (true) {
+    if (!reported && PresentClock::now() - waitStart >= std::chrono::seconds{2}) {
+      Log.warn("Frame stalled: staging map slot={} state={}", slot,
+               static_cast<int>(g_mappingStates[slot].load(std::memory_order_acquire)));
+      reported = true;
+    }
     const auto mappingState = g_mappingStates[slot].load(std::memory_order_acquire);
     if (mappingState == BufferMapState::Mapped) {
       return true;
@@ -617,7 +630,12 @@ bool wait_for_staging_buffer(size_t slot) {
 size_t acquire_frame_slot() {
   ZoneScopedN("Acquire frame slot");
   const auto waitStart = PresentClock::now();
+  bool reported = false;
   while (true) {
+    if (!reported && PresentClock::now() - waitStart >= std::chrono::seconds{2}) {
+      Log.warn("Frame stalled: frame slots exhausted; render_idle={}", render_worker::is_idle());
+      reported = true;
+    }
     if (const auto slot = g_frameSlots.try_acquire()) {
       const auto waitDuration = PresentClock::now() - waitStart;
       const double waitMs = std::chrono::duration<double, std::milli>{waitDuration}.count();
@@ -630,7 +648,13 @@ size_t acquire_frame_slot() {
 
 std::optional<size_t> acquire_mapped_staging_buffer() {
   ZoneScopedN("Acquire mapped staging buffer");
+  const auto waitStart = PresentClock::now();
+  bool reported = false;
   while (true) {
+    if (!reported && PresentClock::now() - waitStart >= std::chrono::seconds{2}) {
+      Log.warn("Frame stalled: staging slots exhausted; render_idle={}", render_worker::is_idle());
+      reported = true;
+    }
     if (auto slot = g_stagingSlots.try_acquire()) {
       if (wait_for_staging_buffer(*slot)) {
         return *slot;
