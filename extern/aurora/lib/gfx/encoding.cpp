@@ -36,7 +36,7 @@ using webgpu::g_queue;
 namespace {
 constexpr Module Log{"aurora::gfx"};
 WGPURenderPipeline g_currentPipeline = nullptr;
-StateCache<WGPUBindGroup> g_textureGroupCache;
+StateCache<BindGroupRef> g_textureGroupCache;
 
 void apply_viewport(const wgpu::RenderPassEncoder& pass, const Viewport& vp) {
   const auto depth = gx::viewport_depth(vp.znear, vp.zfar, gx::UseReversedZ);
@@ -122,7 +122,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
 
   // Bind bind group for the whole pass
   pass.SetBindGroup(0, resources().staticBindGroup);
-  bind_texture_group(gx::g_emptyTextureBindGroup, pass);
+  pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
 
   for (auto& cmd : passInfo.commands) {
 #ifdef AURORA_GFX_DEBUG_GROUPS
@@ -167,7 +167,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
       g_textureGroupCache.invalidate();
       g_currentPipeline = nullptr;
       pass.SetBindGroup(0, resources().staticBindGroup);
-      bind_texture_group(gx::g_emptyTextureBindGroup, pass);
+      pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
       if (hasViewport) {
         apply_viewport(pass, currentViewport);
       }
@@ -487,14 +487,13 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
 }
 } // namespace detail
 
-void bind_texture_group(const wgpu::BindGroup& group, const wgpu::RenderPassEncoder& pass) {
-#ifdef AURORA_ENABLE_RMLUI
-  pass.SetBindGroup(2, group);
-#else
-  if (g_textureGroupCache.update(group.Get())) {
-    pass.SetBindGroup(2, group);
+void bind_texture_group(BindGroupRef ref, const wgpu::RenderPassEncoder& pass) {
+#ifndef AURORA_ENABLE_RMLUI
+  if (!g_textureGroupCache.update(ref)) {
+    return;
   }
 #endif
+  pass.SetBindGroup(2, find_bind_group(ref));
 }
 
 void bind_pipeline(const wgpu::RenderPipeline& pipeline, const wgpu::RenderPassEncoder& pass) {

@@ -6,7 +6,7 @@ namespace aurora::gfx {
 
 bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass);
 void bind_pipeline(const wgpu::RenderPipeline& pipeline, const wgpu::RenderPassEncoder& pass);
-void bind_texture_group(const wgpu::BindGroup& group, const wgpu::RenderPassEncoder& pass);
+void bind_texture_group(BindGroupRef ref, const wgpu::RenderPassEncoder& pass);
 
 namespace detail {
 bool encode_deferred_frame(wgpu::CommandEncoder& encoder, FramePacket& frame);

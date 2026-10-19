@@ -17,13 +17,18 @@ int main() {
   assert(bindings.update(0));
 
   unsigned commands = 0;
+  unsigned lookups = 0;
   for (unsigned pass = 0; pass < 8; ++pass) {
     bindings.invalidate();
     for (unsigned draw = 0; draw < 100; ++draw) {
-      commands += bindings.update(42);
+      if (bindings.update(42)) {
+        ++lookups;
+        ++commands;
+      }
     }
   }
   assert(commands == 8);
+  assert(lookups == 8);
   bindings.invalidate();
   assert(bindings.update(42));
   assert(bindings.update(99));
