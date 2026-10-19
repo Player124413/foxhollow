@@ -5,6 +5,7 @@
 #include <aurora/event.h>
 #include <SDL3/SDL_timer.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "foxhollow_autosave.h"
 #include "foxhollow_compat.h"
 #include "foxhollow_config.h"
@@ -157,7 +158,11 @@ VIRetraceCallback VISetPostRetraceCallback(VIRetraceCallback cb) {
 
 void VISetNextFrameBuffer(void* fb) { sNextFrameBuffer = fb; }
 void* VIGetNextFrameBuffer(void) { return sNextFrameBuffer; }
-void VISetBlack(BOOL black) { sBlack = black ? 1 : 0; }
+void VISetBlack(BOOL black) {
+  const int next = black ? 1 : 0;
+  if (next != sBlack) fprintf(stderr, "[foxhollow] video black=%d retrace=%u\n", next, sRetraceCount);
+  sBlack = next;
+}
 u32 VIGetRetraceCount(void) { return sRetraceCount; }
 u32 VIGetNextField(void) { return 0; }
 u32 VIGetDTVStatus(void) { return 1; }
