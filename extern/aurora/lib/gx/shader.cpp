@@ -6,6 +6,7 @@
 #include "gx.hpp"
 #include "gx_fmt.hpp"
 #include "shader_info.hpp"
+#include "vertex_fetch.hpp"
 
 #include <dolphin/gx/GXEnum.h>
 
@@ -1434,7 +1435,7 @@ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlph
           fmt::format("\n    // Perspective fog\n    var fogBase = ubuf.fog.a / (ubuf.fog.b - {});", fogDepth);
     }
     if (config.fogRangeEnabled) {
-      fragmentFn += "\n        fogBase *= bitcast<f32>(abuf[imm.fog_range_base + u32(in.pos.x)]);";
+      fragmentFn += "\n        fogBase *= bitcast<f32>(load_word(&abuf, imm.fog_range_base + u32(in.pos.x)));";
     }
     fragmentFn += "\n    var fogF = clamp(fogBase - ubuf.fog.c, 0.0, 1.0);";
     switch (config.fogType) {
@@ -1574,16 +1575,7 @@ fn bswap16(v: u32, le: bool) -> u32 {{
   return select(((v & 0xFFu) << 8u) | (v >> 8u), v, le);
 }}
 
-fn load_word(p: ptr<storage, array<u32>>, word_idx: u32) -> u32 {{
-  // This guard is not expected to handle routine out-of-bounds accesses.
-  // It appears to discourage some Adreno drivers/optimizers from storage buffer
-  // optimizations that can cause visual artifacts, including vertex explosions
-  // in Dusklight.
-  if (word_idx < arrayLength(p)) {{
-    return p[word_idx];
-  }}
-  return 0u;
-}}
+{12}
 
 fn load_u8(p: ptr<storage, array<u32>>, byte_off: u32) -> u32 {{
   let word = load_word(p, byte_off / 4u);
@@ -1928,7 +1920,11 @@ fn fs_main(in: VertexOutput) -> {10} {{{6}{5}{11}
 }}
 )""",
                   uniBufAttrs, texBindings, vtxOutAttrs, vtxInAttrs, vtxXfrAttrs, fragmentFn, fragmentFnPre,
-                  vtxXfrAttrsPre, uniformPre, fragmentOutput, fragmentOutputType, fragmentReturn);
+                  vtxXfrAttrsPre, uniformPre, fragmentOutput, fragmentOutputType, fragmentReturn,
+                  vertex_load_word_source(webgpu::g_textureVertexFetch));
+  if (webgpu::g_textureVertexFetch) {
+    use_texture_vertex_fetch(shaderSource);
+  }
   if (dstAlphaMode == DstAlphaMode::DualSource) {
     shaderSource.insert(0, "enable dual_source_blending;\n");
   }

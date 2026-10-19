@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "naga-wasm": "30.2.0"
+  }
+}

@@ -18,3 +18,5 @@ android/__pycache__/
 .venv/
 
 /.android-signing/
+
+tests/shaders/node_modules/

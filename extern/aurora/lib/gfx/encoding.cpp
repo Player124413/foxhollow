@@ -1,6 +1,7 @@
 #include "encoding.hpp"
 
 #include "frame.hpp"
+#include "linear_texture.hpp"
 
 #include "clear.hpp"
 #include "depth_peek.hpp"
@@ -356,6 +357,28 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
   copied = highWater;
 }
 
+void copy_staging_texture_range(wgpu::CommandEncoder& cmd, const FramePacket& frame, uint32_t copied,
+                                uint32_t highWater, uint64_t stagingOffset, const wgpu::Texture& dst) {
+  const auto range = linear_texture_copy_range(copied, highWater);
+  if (range.rows == 0) {
+    return;
+  }
+  const wgpu::TexelCopyBufferInfo src{
+      .layout = {
+          .offset = stagingOffset + range.offset,
+          .bytesPerRow = LinearTextureBytesPerRow,
+          .rowsPerImage = range.rows,
+      },
+      .buffer = staging_buffer(frame.stagingBuffer),
+  };
+  const wgpu::TexelCopyTextureInfo tex{
+      .texture = dst,
+      .origin = {0, range.y, 0},
+  };
+  const wgpu::Extent3D extent{LinearTextureWidth, range.rows, 1};
+  cmd.CopyBufferToTexture(&src, &tex, &extent);
+}
+
 bool needs_staging_copy(const FramePacket& frame, const FrameOp& op) {
   const auto& highWater = op.highWater;
   if (highWater.verts > frame.copied.verts || highWater.uniforms > frame.copied.uniforms ||
@@ -375,6 +398,12 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
   const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
   const auto& highWater = op.highWater;
   auto& res = resources();
+  if (webgpu::g_textureVertexFetch) {
+    copy_staging_texture_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset,
+                               res.vertexDataTexture);
+    copy_staging_texture_range(cmd, frame, frame.copied.storage, highWater.storage, StorageStagingOffset,
+                               res.storageDataTexture);
+  }
   copy_staging_buffer_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset, res.vertexBuffer);
   copy_staging_buffer_range(cmd, frame, frame.copied.uniforms, highWater.uniforms, UniformStagingOffset,
                             res.uniformBuffer);

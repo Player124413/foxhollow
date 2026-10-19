@@ -20,6 +20,7 @@
 
 #include "../gx/gx.hpp"
 #include "../gfx/frame.hpp"
+#include "../gfx/linear_texture.hpp"
 #include "../gfx/recording.hpp"
 #include "../gfx/render_worker.hpp"
 #include "../internal.hpp"
@@ -67,6 +68,7 @@ wgpu::Instance g_instance;
 wgpu::AdapterInfo g_adapterInfo;
 static wgpu::SurfaceCapabilities g_surfaceCapabilities;
 bool g_hasCoreFeatures = false;
+bool g_textureVertexFetch = false;
 bool g_dualSourceBlendingSupported = false;
 bool g_bcTexturesSupported = false;
 bool g_astcTexturesSupported = false;
@@ -898,11 +900,22 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
            magic_enum::enum_name(g_adapterInfo.adapterType), description);
 
   {
-    wgpu::Limits supportedLimits{};
-    g_adapter.GetLimits(&supportedLimits);
+    wgpu::CompatibilityModeLimits supportedCompatibilityLimits{};
+    wgpu::Limits supportedLimits{.nextInChain = &supportedCompatibilityLimits};
+    if (g_adapter.GetLimits(&supportedLimits) != wgpu::Status::Success) {
+      Log.error("Failed to query adapter limits");
+      return false;
+    }
+    g_textureVertexFetch = gfx::needs_texture_vertex_fetch(
+        supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
+        supportedCompatibilityLimits.maxStorageBuffersInFragmentStage);
+    Log.info("Vertex data path: {}; storage buffers vertex={}, fragment={}",
+             g_textureVertexFetch ? "RGBA32Uint texture fetch" : "storage buffer fetch",
+             supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
+             supportedCompatibilityLimits.maxStorageBuffersInFragmentStage);
     wgpu::CompatibilityModeLimits compatibilityModeLimits{wgpu::CompatibilityModeLimits::Init{
-        .maxStorageBuffersInVertexStage = 2,
-        .maxStorageBuffersInFragmentStage = 2,
+        .maxStorageBuffersInVertexStage = g_textureVertexFetch ? 0u : 2u,
+        .maxStorageBuffersInFragmentStage = g_textureVertexFetch ? 0u : 1u,
     }};
     const wgpu::Limits requiredLimits{
         .nextInChain = &compatibilityModeLimits,
@@ -915,7 +928,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
                                                                             : supportedLimits.maxTextureDimension3D,
         .maxTextureArrayLayers = supportedLimits.maxTextureArrayLayers == 0 ? WGPU_LIMIT_U32_UNDEFINED
                                                                             : supportedLimits.maxTextureArrayLayers,
-        .maxStorageBuffersPerShaderStage = 2,
+        .maxStorageBuffersPerShaderStage = std::min(2u, supportedLimits.maxStorageBuffersPerShaderStage),
         .minUniformBufferOffsetAlignment =
             supportedLimits.minUniformBufferOffsetAlignment < 64 ? 64 : supportedLimits.minUniformBufferOffsetAlignment,
         .minStorageBufferOffsetAlignment =

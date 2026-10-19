@@ -33,9 +33,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: npm ci --prefix tests/shaders --ignore-scripts --no-audit --no-fund
       - run: cmake -S tests -B build-input-tests -G Ninja -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build-input-tests --parallel 2
       - run: ctest --test-dir build-input-tests --output-on-failure
+      - run: node tests/shaders/validate.mjs build-input-tests/vertex-fetch.wgsl
   apk:
     needs: input-tests
     runs-on: ubuntu-24.04
