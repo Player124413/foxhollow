@@ -12,6 +12,7 @@
             android:text="@string/check_updates" />
         <Button android:id="@+id/about" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="@string/about" />
+        <Button android:id="@+id/logs" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/logs" />
         <TextView android:id="@+id/disc_status" style="@style/Label" android:accessibilityLiveRegion="polite" />
         <Button android:id="@+id/play" android:layout_width="match_parent" android:layout_height="64dp"
             android:layout_marginTop="20dp" android:text="@string/play" />

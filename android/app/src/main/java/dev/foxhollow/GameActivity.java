@@ -10,6 +10,8 @@ import java.io.File;
 public final class GameActivity extends BorealisActivity {
     @Override
     protected void onCreate(Bundle state) {
+        Diagnostics.start(this, "game");
+        Diagnostics.gameSettings(this, getIntent());
         super.onCreate(state);
         if (getIntent().getBooleanExtra("keepScreenOn", true))
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -23,6 +25,7 @@ public final class GameActivity extends BorealisActivity {
     @Override
     protected String[] getArguments() {
         Intent intent = getIntent();
+        SDLActivity.nativeSetenv("FOXHOLLOW_LOG_FILE", new File(Diagnostics.directory(this), "native.log").getAbsolutePath());
         SDLActivity.nativeSetenv("FOXHOLLOW_USER_DIR", getFilesDir().getAbsolutePath());
         SDLActivity.nativeSetenv("FOXHOLLOW_CACHE_DIR", getCacheDir().getAbsolutePath());
         SDLActivity.nativeSetenv("FOXHOLLOW_MEMORY_CARD", new File(getFilesDir(), "memorycard.raw").getAbsolutePath());

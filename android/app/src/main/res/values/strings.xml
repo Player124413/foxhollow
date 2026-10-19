@@ -58,4 +58,12 @@
   <string name="public_signing_notice">Public debug signing key: install updates only from a trusted source.</string>
   <string name="etc2">ETC2 texture compression</string>
   <string name="etc2_note">Compresses supported static CMPR/BC1 textures when the GPU supports ETC2. Uses a disk cache; first loading may take longer. Changes apply on the next launch.</string>
+  <string name="logs">Logs</string>
+  <string name="logs_copy">Copy</string>
+  <string name="logs_share">Share file</string>
+  <string name="logs_privacy">Only app logs are collected. Reports include device details, settings and error messages. Review before sharing. Nothing is sent automatically.</string>
+  <string name="logs_truncated">Recent fragment shown/copied. Share as a file for the larger diagnostic report.</string>
+  <string name="logs_copied">Logs copied</string>
+  <string name="logs_error">Could not share logs. Check available storage and installed apps.</string>
+  <string name="logs_loading">Collecting logs…</string>
 </resources>

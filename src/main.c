@@ -11,6 +11,7 @@
 
 #include "foxhollow_config.h"
 #include "foxhollow_crash.h"
+#include "foxhollow_log.h"
 #include "foxhollow_mods.h"
 #include "foxhollow_splash.h"
 
@@ -85,8 +86,10 @@ static void log_callback(AuroraLogLevel level, const char* module, const char* m
 #if defined(__ANDROID__)
   const int priorities[] = {ANDROID_LOG_DEBUG, ANDROID_LOG_INFO, ANDROID_LOG_WARN, ANDROID_LOG_ERROR, ANDROID_LOG_FATAL};
   __android_log_print(priorities[level], "Foxhollow", "%s: %s", module, message);
-#endif
+  if (level != LOG_DEBUG) fhWriteFileLog(levelStr, module, message, len);
+#else
   fprintf(out, "[%s] %s: %s\n", levelStr, module, message);
+#endif
   if (level == LOG_FATAL) {
     fflush(out);
     abort();

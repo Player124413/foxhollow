@@ -26,6 +26,7 @@ public final class LauncherActivity extends Activity {
     private boolean importing;
     private Settings settings;
     private boolean checkingUpdates;
+    private boolean loadingLogs;
 
     @Override
     protected void attachBaseContext(android.content.Context base) {
@@ -44,6 +45,7 @@ public final class LauncherActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle state) {
+        Diagnostics.start(this, "launcher");
         super.onCreate(state);
         if (android.os.Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
         settings = new Settings(this);
@@ -84,6 +86,7 @@ public final class LauncherActivity extends Activity {
             }
             public void onNothingSelected(AdapterView<?> parent) {}
         });
+        findViewById(R.id.logs).setOnClickListener(view -> showLogs());
         findViewById(R.id.about).setOnClickListener(view -> showCommunity());
         findViewById(R.id.check_updates).setOnClickListener(view -> checkUpdates());
         findViewById(R.id.play).setOnClickListener(view -> {
@@ -126,6 +129,76 @@ public final class LauncherActivity extends Activity {
             if (!deleteChildren(getCacheDir())) error(getString(R.string.io_error));
         }));
         updateStatus();
+    }
+
+    private void showLogs() {
+        if (loadingLogs || importing) return;
+        loadingLogs = true;
+        updateStatus();
+        worker.execute(() -> {
+            Diagnostics.captureLogcat(this);
+            String report = LogFiles.report(Diagnostics.directory(this), Diagnostics.header(this));
+            runOnUiThread(() -> {
+                loadingLogs = false;
+                if (isFinishing() || isDestroyed()) return;
+                updateStatus();
+                android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+                TextView text = new TextView(this);
+                text.setText(LogFiles.copyText(report, getString(R.string.logs_truncated)));
+                text.setTextIsSelectable(true);
+                text.setTypeface(android.graphics.Typeface.MONOSPACE);
+                text.setTextSize(12);
+                int padding = (int)(16 * getResources().getDisplayMetrics().density);
+                text.setPadding(padding, padding, padding, padding);
+                scroll.addView(text);
+                AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.logs)
+                    .setMessage(R.string.logs_privacy).setView(scroll)
+                    .setPositiveButton(R.string.logs_copy, null)
+                    .setNeutralButton(R.string.logs_share, null)
+                    .setNegativeButton(R.string.close, null).create();
+                dialog.setOnShowListener(visible -> {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(button -> {
+                        android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                        android.content.ClipData clip = android.content.ClipData.newPlainText("Foxhollow logs",
+                            LogFiles.copyText(report, getString(R.string.logs_truncated)));
+                        android.os.PersistableBundle extras = new android.os.PersistableBundle();
+                        extras.putBoolean("android.content.extra.IS_SENSITIVE", true);
+                        clip.getDescription().setExtras(extras);
+                        clipboard.setPrimaryClip(clip);
+                        android.widget.Toast.makeText(this, R.string.logs_copied, android.widget.Toast.LENGTH_SHORT).show();
+                    });
+                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(button -> shareLogs(report));
+                    if (dialog.getWindow() != null) dialog.getWindow().setLayout(
+                        (int)(getResources().getDisplayMetrics().widthPixels * .95f),
+                        (int)(getResources().getDisplayMetrics().heightPixels * .85f));
+                });
+                dialog.show();
+            });
+        });
+    }
+
+    private void shareLogs(String report) {
+        try {
+            File directory = new File(getCacheDir(), "shared-logs");
+            if (!directory.isDirectory() && !directory.mkdirs()) throw new java.io.IOException();
+            File[] old = directory.listFiles();
+            if (old != null) {
+                java.util.Arrays.sort(old, java.util.Comparator.comparingLong(File::lastModified));
+                for (int i = 0; i < old.length - 3; ++i) if (old[i].isFile()) old[i].delete();
+            }
+            File file = File.createTempFile("foxhollow-", ".txt", directory);
+            try (FileOutputStream output = new FileOutputStream(file)) {
+                output.write(report.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".logs", file);
+            Intent share = new Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_SUBJECT, "Foxhollow logs")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            share.setClipData(android.content.ClipData.newUri(getContentResolver(), "Foxhollow logs", uri));
+            startActivity(Intent.createChooser(share, getString(R.string.logs_share)));
+        } catch (java.io.IOException | android.content.ActivityNotFoundException error) {
+            error(getString(R.string.logs_error));
+        }
     }
 
     private void openLink(String url) {
@@ -256,6 +329,8 @@ public final class LauncherActivity extends Activity {
 
     private void updateStatus() {
         File disc = new File(getFilesDir(), "disc.img");
+        findViewById(R.id.logs).setEnabled(!importing && !loadingLogs);
+        ((TextView)findViewById(R.id.logs)).setText(loadingLogs ? R.string.logs_loading : R.string.logs);
         findViewById(R.id.language).setEnabled(!importing);
         findViewById(R.id.check_updates).setEnabled(!importing && !checkingUpdates);
         ((TextView)findViewById(R.id.check_updates)).setText(checkingUpdates ? R.string.checking_updates : R.string.check_updates);
