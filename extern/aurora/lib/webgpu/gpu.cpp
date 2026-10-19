@@ -1008,7 +1008,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
         "emit_hlsl_debug_symbols",
 #endif
 #endif
-#ifdef NDEBUG
+#if defined(NDEBUG) && !defined(__ANDROID__) && !defined(ANDROID)
         "skip_validation",
         "disable_robustness",
 #endif

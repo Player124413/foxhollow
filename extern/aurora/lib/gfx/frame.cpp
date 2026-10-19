@@ -1,5 +1,6 @@
 #include "frame.hpp"
 #include "linear_texture.hpp"
+#include "vertex_data_layout.hpp"
 
 #include "depth_peek.hpp"
 #include "pipeline_cache.hpp"
@@ -440,26 +441,7 @@ void initialize() {
   }
 
   {
-    std::array layoutEntries{
-        // Vertex data buffer
-        wgpu::BindGroupLayoutEntry{
-            .binding = 0,
-            .visibility = wgpu::ShaderStage::Vertex,
-            .buffer =
-                wgpu::BufferBindingLayout{
-                    .type = wgpu::BufferBindingType::ReadOnlyStorage,
-                },
-        },
-        // Storage data buffer
-        wgpu::BindGroupLayoutEntry{
-            .binding = 1,
-            .visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment,
-            .buffer =
-                wgpu::BufferBindingLayout{
-                    .type = wgpu::BufferBindingType::ReadOnlyStorage,
-                },
-        },
-    };
+    const auto layoutEntries = vertex_data_layout_entries(webgpu::g_textureVertexFetch);
     if (webgpu::g_textureVertexFetch) {
       static_assert(VertexBufferSize % LinearTextureBytesPerRow == 0);
       static_assert(StorageBufferSize % LinearTextureBytesPerRow == 0);
@@ -475,13 +457,6 @@ void initialize() {
       };
       g_resources.vertexDataTexture = createDataTexture(VertexBufferSize, "Vertex data texture");
       g_resources.storageDataTexture = createDataTexture(StorageBufferSize, "Storage data texture");
-      for (auto& entry : layoutEntries) {
-        entry.buffer = {};
-        entry.texture = {
-            .sampleType = wgpu::TextureSampleType::Uint,
-            .viewDimension = wgpu::TextureViewDimension::e2D,
-        };
-      }
     }
     const wgpu::BindGroupLayoutDescriptor layoutDesc{
         .label = "Static bind group layout",
