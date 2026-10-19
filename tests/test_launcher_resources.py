@@ -34,6 +34,7 @@ class LauncherResourcesTest(unittest.TestCase):
                              re.findall(r"%\d+\$[ds]", "".join(b.itertext())))
         for entries in (english, russian):
             message = entries["community_message"].text
+            self.assertIn("Ranger Fox", message)
             self.assertIn("https://t.me/player1444ports", message)
             self.assertIn("https://github.com/JackPriceBurns/foxhollow", message)
             self.assertEqual([item.text for item in entries["language_labels"]], ["English", "Русский"])

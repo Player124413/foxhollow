@@ -46,7 +46,7 @@
   <string name="up_to_date">У вас последний релиз (%1$s).</string>
   <string name="open_release">Открыть релиз</string>
   <string name="about">Сообщество и благодарности</string>
-  <string name="community_message">Мой Telegram-канал: https://t.me/player1444ports\n\nБез этого репозитория порт бы не вышел:\nhttps://github.com/JackPriceBurns/foxhollow</string>
+  <string name="community_message">Мой Telegram-канал: https://t.me/player1444ports\n\nБез этого репозитория порт бы не вышел:\nhttps://github.com/JackPriceBurns/foxhollow\n\nСпасибо Ranger Fox за тестирование этого порта!</string>
   <string name="telegram">Telegram-канал</string>
   <string name="upstream">Исходный репозиторий</string>
   <string name="close">Закрыть</string>
