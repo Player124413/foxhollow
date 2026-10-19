@@ -12,6 +12,7 @@
 #include "tex_palette_conv.hpp"
 #include "texture_replacement.hpp"
 #include "../gx/gx.hpp"
+#include "../gx/fifo.hpp"
 #ifdef AURORA_ENABLE_RMLUI
 #include "../rmlui/pipeline.hpp"
 #endif
@@ -783,6 +784,7 @@ void after_submit() noexcept { depth_peek::after_submit(); }
 
 void gpu_synchronize() {
   if (!render_worker::is_worker_thread()) {
+    gx::fifo::drain();
     flush_deferred_ops();
   }
   render_worker::synchronize();
