@@ -3,6 +3,7 @@
 
 #ifdef AURORA_ENABLE_GX
 #include "gfx/resources.hpp"
+#include "gfx/frame_probe.hpp"
 #include "gfx/frame.hpp"
 #include "gfx/recording.hpp"
 #include "gfx/render_worker.hpp"
@@ -45,6 +46,52 @@ constexpr Module Log{"aurora"};
 using webgpu::g_device;
 using webgpu::g_queue;
 using webgpu::g_surface;
+
+#ifdef __ANDROID__
+void probe_frame_rows(wgpu::CommandEncoder& encoder, const webgpu::TextureWithSampler& source,
+                      const char* stage, uint32_t frame, std::vector<gfx::AfterSubmitCallback>& callbacks) {
+  if (!source.texture || source.size.width == 0 || source.size.height == 0 ||
+      source.texture.GetSampleCount() != 1) return;
+  if (source.format != wgpu::TextureFormat::RGBA8Unorm && source.format != wgpu::TextureFormat::BGRA8Unorm &&
+      source.format != wgpu::TextureFormat::RGBA8UnormSrgb && source.format != wgpu::TextureFormat::BGRA8UnormSrgb) return;
+  const uint32_t width = source.size.width;
+  const uint32_t height = source.size.height;
+  const uint32_t pitch = gfx::probe_row_pitch(width);
+  const uint64_t bytes = static_cast<uint64_t>(pitch) * 3u;
+  const wgpu::BufferDescriptor descriptor{
+      .label = "Frame probe readback",
+      .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
+      .size = bytes,
+  };
+  auto buffer = g_device.CreateBuffer(&descriptor);
+  for (uint32_t row = 0; row < 3; ++row) {
+    const wgpu::TexelCopyTextureInfo src{
+        .texture = source.texture,
+        .origin = {0, (height - 1u) * (row + 1u) / 4u, 0},
+    };
+    const wgpu::TexelCopyBufferInfo dst{
+        .layout = {.offset = static_cast<uint64_t>(pitch) * row, .bytesPerRow = pitch, .rowsPerImage = 1},
+        .buffer = buffer,
+    };
+    const wgpu::Extent3D extent{width, 1, 1};
+    encoder.CopyTextureToBuffer(&src, &dst, &extent);
+  }
+  callbacks.emplace_back([buffer, stage, frame, width, height, pitch, bytes] {
+    buffer.MapAsync(wgpu::MapMode::Read, 0, bytes, wgpu::CallbackMode::AllowSpontaneous,
+        [buffer, stage, frame, width, height, pitch, bytes](wgpu::MapAsyncStatus status, wgpu::StringView) {
+          if (status != wgpu::MapAsyncStatus::Success) {
+            Log.warn("Frame probe: frame={} stage={} map_status={}", frame, stage, magic_enum::enum_name(status));
+            return;
+          }
+          const auto* data = static_cast<const uint8_t*>(buffer.GetConstMappedRange(0, bytes));
+          const auto stats = gfx::probe_rows(data, width, pitch);
+          Log.info("Frame probe: frame={} stage={} size={}x{} nonblack={}/{} max_rgb={} nonopaque={}",
+                   frame, stage, width, height, stats.nonblack, width * 3u, stats.maxRgb, stats.nonopaque);
+          buffer.Unmap();
+        });
+  });
+}
+#endif
 
 uint32_t clamp_scissor_coord(double value, uint32_t maximum) noexcept {
   if (!std::isfinite(value)) {
@@ -325,6 +372,18 @@ void end_frame() noexcept {
         presentBindGroup = rmlBindGroup;
       } else {
         const auto& resampledSource = webgpu::resample_present_source(encoder, viewport);
+#ifdef __ANDROID__
+        static uint32_t probeFrame = 0;
+        ++probeFrame;
+        if (probeFrame == 60 || probeFrame == 300 || probeFrame == 600 || probeFrame == 900 || probeFrame == 1200) {
+          probe_frame_rows(encoder, webgpu::present_source(), "efb", probeFrame, afterSubmitCallbacks);
+          probe_frame_rows(encoder, resampledSource, "resampled", probeFrame, afterSubmitCallbacks);
+          Log.info("Present probe: frame={} viewport={},{},{}x{} surface={}x{}", probeFrame,
+                   viewport.left, viewport.top, viewport.width, viewport.height,
+                   webgpu::g_graphicsConfig.surfaceConfiguration.width,
+                   webgpu::g_graphicsConfig.surfaceConfiguration.height);
+        }
+#endif
         presentBindGroup = webgpu::create_copy_bind_group(resampledSource);
       }
       {
