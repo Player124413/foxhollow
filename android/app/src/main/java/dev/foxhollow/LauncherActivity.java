@@ -138,13 +138,14 @@ public final class LauncherActivity extends Activity {
         worker.execute(() -> {
             Diagnostics.captureLogcat(this);
             String report = LogFiles.report(Diagnostics.directory(this), Diagnostics.header(this));
+            String concise = LogFiles.conciseReport(Diagnostics.directory(this), Diagnostics.header(this));
             runOnUiThread(() -> {
                 loadingLogs = false;
                 if (isFinishing() || isDestroyed()) return;
                 updateStatus();
                 android.widget.ScrollView scroll = new android.widget.ScrollView(this);
                 TextView text = new TextView(this);
-                text.setText(LogFiles.copyText(report, getString(R.string.logs_truncated)));
+                text.setText(LogFiles.copyText(concise, getString(R.string.logs_truncated)));
                 text.setTextIsSelectable(true);
                 text.setTypeface(android.graphics.Typeface.MONOSPACE);
                 text.setTextSize(12);
@@ -160,7 +161,7 @@ public final class LauncherActivity extends Activity {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(button -> {
                         android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
                         android.content.ClipData clip = android.content.ClipData.newPlainText("Foxhollow logs",
-                            LogFiles.copyText(report, getString(R.string.logs_truncated)));
+                            LogFiles.copyText(concise, getString(R.string.logs_truncated)));
                         android.os.PersistableBundle extras = new android.os.PersistableBundle();
                         extras.putBoolean("android.content.extra.IS_SENSITIVE", true);
                         clip.getDescription().setExtras(extras);

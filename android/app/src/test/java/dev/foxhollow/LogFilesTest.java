@@ -7,6 +7,28 @@ import java.nio.file.Files;
 import java.nio.charset.StandardCharsets;
 
 public final class LogFilesTest {
+    @Test public void conciseReportPrioritizesStartupFailure() throws Exception {
+        File directory = Files.createTempDirectory("foxhollow-startup").toFile();
+        try {
+            LogFiles.append(new File(directory, "game-events.log"), "phase=load_libraries_failed error=UnsatisfiedLinkError");
+            LogFiles.append(new File(directory, "exit-info.log"), "reason=NATIVE_CRASH status=11");
+            LogFiles.append(new File(directory, "game.log"), "10-19 12:00:00.000 123 123 D MiuiMultiWindowUtils: irrelevant JSON");
+            LogFiles.append(new File(directory, "game.log"), "10-19 12:00:00.001 123 123 E AndroidRuntime: FATAL EXCEPTION");
+            LogFiles.append(new File(directory, "native.log"), "GPU initialization failed");
+            String concise = LogFiles.conciseReport(directory, "HEADER");
+            assertTrue(concise.contains("UnsatisfiedLinkError"));
+            assertTrue(concise.contains("NATIVE_CRASH"));
+            assertTrue(concise.contains("FATAL EXCEPTION"));
+            assertTrue(concise.contains("GPU initialization failed"));
+            assertFalse(concise.contains("irrelevant JSON"));
+            assertTrue(LogFiles.report(directory, "HEADER").contains("irrelevant JSON"));
+            assertTrue(concise.length() < LogFiles.COPY_LIMIT);
+        } finally {
+            for (File file : directory.listFiles()) file.delete();
+            directory.delete();
+        }
+    }
+
     @Test public void rotationAndRetention() throws Exception {
         File directory = Files.createTempDirectory("foxhollow-logs").toFile();
         File log = new File(directory, "game.log");

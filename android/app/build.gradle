@@ -26,6 +26,10 @@ android {
     defaultConfig {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         if (buildNumber) versionCode 1000000000 + Integer.parseInt(buildNumber)
+        if (!versionName || versionName.contains('UNKNOWN')) {
+            def revision = System.getenv('GITHUB_SHA') ?: 'local'
+            versionName "dev-${revision.take(8)}"
+        }
     }
     if (signingPath) {
         signingConfigs {

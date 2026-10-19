@@ -12,9 +12,37 @@ public final class GameActivity extends BorealisActivity {
     protected void onCreate(Bundle state) {
         Diagnostics.start(this, "game");
         Diagnostics.gameSettings(this, getIntent());
+        Diagnostics.gameEvent(this, "phase=activity_create");
         super.onCreate(state);
+        Diagnostics.gameEvent(this, "phase=activity_created brokenLibraries=" + mBrokenLibraries);
         if (getIntent().getBooleanExtra("keepScreenOn", true))
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    @Override
+    public void loadLibraries() {
+        Diagnostics.gameEvent(this, "phase=load_libraries");
+        try {
+            super.loadLibraries();
+            Diagnostics.gameEvent(this, "phase=libraries_loaded");
+        } catch (RuntimeException | LinkageError error) {
+            Diagnostics.gameEvent(this, android.util.Log.getStackTraceString(error));
+            Diagnostics.gameEvent(this, "phase=load_libraries_failed error=" + error);
+            throw error;
+        }
+    }
+
+    @Override
+    protected void main() {
+        String library = getMainSharedObject();
+        String function = getMainFunction();
+        Diagnostics.gameEvent(this, "phase=prepare_arguments");
+        String[] arguments = getArguments();
+        File disc = new File(getFilesDir(), "disc.img");
+        Diagnostics.gameEvent(this, "phase=native_entry library=" + library + " function=" + function
+            + " discExists=" + disc.isFile() + " discReadable=" + disc.canRead() + " discBytes=" + disc.length());
+        int status = SDLActivity.nativeRunMain(library, function, arguments);
+        Diagnostics.gameEvent(this, "phase=native_return status=" + status);
     }
 
     private static String allowed(String value, String[] choices, String fallback) {
@@ -47,6 +75,8 @@ public final class GameActivity extends BorealisActivity {
 
     @Override
     protected void onDestroy() {
+        Diagnostics.gameEvent(this, "phase=activity_destroy finishing=" + isFinishing()
+            + " changingConfiguration=" + isChangingConfigurations());
         super.onDestroy();
         android.os.Process.killProcess(android.os.Process.myPid());
     }
