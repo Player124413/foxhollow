@@ -205,6 +205,7 @@ struct FramePacket {
   uint32_t frameIndex = 0;
   size_t stagingBuffer = 0;
   StagingHighWater copied;
+  bool deferEncoding = false;
   AuroraStats stats{};
 };
 

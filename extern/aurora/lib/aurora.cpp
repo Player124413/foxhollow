@@ -25,6 +25,7 @@
 #include "thread.hpp"
 #include "window.hpp"
 
+#include <chrono>
 #include <SDL3/SDL_filesystem.h>
 #include <magic_enum.hpp>
 
@@ -292,6 +293,13 @@ void end_frame() noexcept {
   gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
                   imguiDrawData = std::move(imguiDrawData)](
                      wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks) {
+    using TimingClock = std::chrono::steady_clock;
+    const auto millisecondsSince = [](TimingClock::time_point start) {
+      return std::chrono::duration<double, std::milli>(TimingClock::now() - start).count();
+    };
+    auto& timings = gfx::detail::resources().timings;
+    timings = {};
+    const auto acquireStart = TimingClock::now();
     wgpu::Texture currentTexture;
     wgpu::TextureView currentView;
     auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
@@ -309,6 +317,7 @@ void end_frame() noexcept {
       }
     }
 
+    timings.acquireMs = millisecondsSince(acquireStart);
     const bool canPresent = currentTexture && currentView;
     if (canPresent) {
       wgpu::BindGroup presentBindGroup;
@@ -372,10 +381,14 @@ void end_frame() noexcept {
     }
     webgpu::gpu_prof::frame_end(encoder);
     const wgpu::CommandBufferDescriptor cmdBufDescriptor{.label = "Redraw command buffer"};
+    const auto finishStart = TimingClock::now();
     const auto buffer = encoder.Finish(&cmdBufDescriptor);
+    timings.finishMs = millisecondsSince(finishStart);
     {
       ZoneScopedN("Queue Submit");
+      const auto submitStart = TimingClock::now();
       g_queue.Submit(1, &buffer);
+      timings.submitMs = millisecondsSince(submitStart);
     }
     webgpu::gpu_prof::after_submit();
     if (canPresent && g_surface) {
@@ -384,7 +397,9 @@ void end_frame() noexcept {
       {
         window::SurfaceLock surfaceLock;
         if (window::is_presentable()) {
+          const auto presentStart = TimingClock::now();
           status = g_surface.Present();
+          timings.presentMs = millisecondsSince(presentStart);
         }
       }
       if (status) {

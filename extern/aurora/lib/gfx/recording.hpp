@@ -16,6 +16,7 @@ struct RecordedFrame {
 
 void begin_recording(FramePacket& packet, size_t frameSlot);
 RecordedFrame end_recording();
+void flush_deferred_ops();
 void shutdown_recording();
 void increment_merged_draw_count() noexcept;
 

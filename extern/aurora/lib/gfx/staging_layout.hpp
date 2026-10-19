@@ -16,6 +16,10 @@ inline constexpr uint64_t IndexStagingOffset = UniformStagingOffset + UniformBuf
 inline constexpr uint64_t StorageStagingOffset = IndexStagingOffset + IndexBufferSize;
 inline constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBufferSize;
 
+constexpr bool can_batch_shared_uploads(bool deferred, bool hasEncoderTask, bool hasCustomDraw) {
+  return deferred && !hasEncoderTask && !hasCustomDraw;
+}
+
 constexpr uint64_t staging_upload_size(uint64_t size) {
   return (size + 3u) & ~uint64_t{3};
 }

@@ -6,7 +6,15 @@
 namespace aurora::gfx {
 
 namespace detail {
+struct FrameTimings {
+  double acquireMs = 0;
+  double finishMs = 0;
+  double submitMs = 0;
+  double presentMs = 0;
+};
+
 struct Resources {
+  FrameTimings timings;
   wgpu::Buffer vertexBuffer;
   wgpu::Buffer uniformBuffer;
   wgpu::Buffer indexBuffer;

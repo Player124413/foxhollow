@@ -539,7 +539,7 @@ void restore_efb() {
 }
 
 void enqueue_op(FramePacket& frame, uint32_t opIndex) {
-  if (opIndex >= frame.ops.size() || g_recorder.suppressRenderWorker) {
+  if (opIndex >= frame.ops.size() || g_recorder.suppressRenderWorker || frame.deferEncoding) {
     return;
   }
   auto op = frame.ops[opIndex];
@@ -560,6 +560,17 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
 } // namespace
 
 namespace detail {
+
+void flush_deferred_ops() {
+  if (!g_recorder.active() || !g_recorder.frame().deferEncoding) {
+    return;
+  }
+  auto& frame = g_recorder.frame();
+  frame.deferEncoding = false;
+  for (uint32_t i = 0; i < frame.ops.size(); ++i) {
+    enqueue_op(frame, i);
+  }
+}
 
 void begin_recording(FramePacket& packet, size_t frameSlot) {
   CHECK(!g_recorder.active(), "A recording session is already active");

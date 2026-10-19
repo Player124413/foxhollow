@@ -385,12 +385,7 @@ bool needs_staging_copy(const FramePacket& frame, const FrameOp& op) {
   return false;
 }
 
-void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op) {
-  if (!needs_staging_copy(frame, op)) {
-    return;
-  }
-  const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
-  const auto& highWater = op.highWater;
+void copy_shared_staging(wgpu::CommandEncoder& cmd, FramePacket& frame, const StagingHighWater& highWater) {
   auto& res = resources();
   if (webgpu::g_textureVertexFetch) {
     copy_staging_texture_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset,
@@ -404,6 +399,15 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
   copy_staging_buffer_range(cmd, frame, frame.copied.indices, highWater.indices, IndexStagingOffset, res.indexBuffer);
   copy_staging_buffer_range(cmd, frame, frame.copied.storage, highWater.storage, StorageStagingOffset,
                             res.storageBuffer);
+}
+
+void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op) {
+  if (!needs_staging_copy(frame, op)) {
+    return;
+  }
+  const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
+  const auto& highWater = op.highWater;
+  copy_shared_staging(cmd, frame, highWater);
 
   if constexpr (UseTextureBuffer) {
     for (size_t i = frame.copied.textureUploadCount; i < op.textureUploads.size(); ++i) {
@@ -426,6 +430,36 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
 } // namespace
 
 namespace detail {
+bool encode_deferred_frame(wgpu::CommandEncoder& cmd, FramePacket& frame) {
+  if (!frame.deferEncoding) {
+    return false;
+  }
+  bool hasEncoderTask = false;
+  bool hasCustomDraw = false;
+  for (const auto& op : frame.ops) {
+    hasEncoderTask |= op.type == FrameOpType::EncoderTask;
+    if (op.renderPass != nullptr) {
+      for (const auto& command : op.renderPass->commands) {
+        hasCustomDraw |= command.type == CommandType::CustomDraw;
+      }
+    }
+  }
+  const bool batched = can_batch_shared_uploads(frame.deferEncoding, hasEncoderTask, hasCustomDraw);
+  if (batched) {
+    const StagingHighWater highWater{
+        .verts = static_cast<uint32_t>(frame.verts.size()),
+        .uniforms = static_cast<uint32_t>(frame.uniforms.size()),
+        .indices = static_cast<uint32_t>(frame.indices.size()),
+        .storage = static_cast<uint32_t>(frame.storage.size()),
+    };
+    copy_shared_staging(cmd, frame, highWater);
+  }
+  for (const auto& op : frame.ops) {
+    encode_op(cmd, frame, op);
+  }
+  return batched;
+}
+
 void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op) {
   copy_staging_to_high_water(cmd, frame, op);
   switch (op.type) {

@@ -1,4 +1,5 @@
 #include "frame.hpp"
+#include "encoding.hpp"
 #include "linear_texture.hpp"
 #include "vertex_data_layout.hpp"
 
@@ -655,6 +656,7 @@ bool begin_frame() {
   frame.frameId = g_nextFrameId++;
   frame.frameIndex = g_frameIndex;
   frame.stagingBuffer = *stagingSlot;
+  frame.deferEncoding = g_queueStaging;
   size_t bufferOffset = 0;
   const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
   const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
@@ -727,6 +729,11 @@ void end_frame(EndFrameCallback callback) {
     [[maybe_unused]] const double uploadMs = std::chrono::duration<double, std::milli>(PresentClock::now() - uploadStart).count();
     TracyPlot("aurora: stagingUploadMs", uploadMs);
     g_mappingStates[stagingSlot].store(BufferMapState::Unmapped, std::memory_order_release);
+    const auto encodeStart = PresentClock::now();
+    [[maybe_unused]] const bool batched = encode_deferred_frame(packet.encoder, packet);
+    [[maybe_unused]] const double encodeMs =
+        std::chrono::duration<double, std::milli>(PresentClock::now() - encodeStart).count();
+    [[maybe_unused]] const auto opCount = packet.ops.size();
     auto encoder = std::move(packet.encoder);
     const auto stats = packet.stats;
     auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
@@ -751,13 +758,16 @@ void end_frame(EndFrameCallback callback) {
       lastPerformanceLog = submitEnd;
       Log.info("Performance: present_ms={:.2f} record_ms={:.2f} submit_ms={:.2f} draws={} merged={} "
                "vertex_bytes={} storage_bytes={} texture_upload_bytes={} vertex_path={} uniform_bytes={} "
-               "upload_ms={:.2f} staging={}",
+               "upload_ms={:.2f} staging={} batched={} ops={} encode_ms={:.2f} "
+               "acquire_ms={:.2f} finish_ms={:.2f} queue_submit_ms={:.2f} present_call_ms={:.2f}",
                static_cast<double>(g_presentPeriodNs.load(std::memory_order_acquire)) / 1'000'000.0,
                static_cast<double>(g_cpuFrameTimeNs.load(std::memory_order_acquire)) / 1'000'000.0,
                std::chrono::duration<double, std::milli>(submitEnd - submitStart).count(),
                stats.drawCallCount, stats.mergedDrawCallCount, stats.lastVertSize, stats.lastStorageSize,
                stats.lastTextureUploadSize, webgpu::g_textureVertexFetch ? "texture" : "storage",
-               stats.lastUniformSize, uploadMs, g_queueStaging ? "queue" : "mapped");
+               stats.lastUniformSize, uploadMs, g_queueStaging ? "queue" : "mapped", batched, opCount, encodeMs,
+               g_resources.timings.acquireMs, g_resources.timings.finishMs,
+               g_resources.timings.submitMs, g_resources.timings.presentMs);
     }
 #endif
     g_frameSlots.release(frameSlot);
@@ -771,9 +781,14 @@ uint32_t current_frame() noexcept { return g_frameIndex; }
 
 void after_submit() noexcept { depth_peek::after_submit(); }
 
-void gpu_synchronize() { render_worker::synchronize(); }
+void gpu_synchronize() {
+  if (!render_worker::is_worker_thread()) {
+    flush_deferred_ops();
+  }
+  render_worker::synchronize();
+}
 
-void synchronize() { render_worker::synchronize(); }
+void synchronize() { gpu_synchronize(); }
 
 void after_present() noexcept {
   const auto now = PresentClock::now();
