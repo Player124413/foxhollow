@@ -7,6 +7,7 @@
 #include "clear.hpp"
 #include "depth_peek.hpp"
 #include "pipeline_cache.hpp"
+#include "resource_cache.hpp"
 #include "tex_copy_conv.hpp"
 #include "tex_palette_conv.hpp"
 #include "../gx/gx.hpp"
