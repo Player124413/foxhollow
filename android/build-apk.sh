@@ -50,3 +50,11 @@ if [[ -n "${FOXHOLLOW_KEYSTORE_FILE:-}" ]]; then
     "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$(dirname "$apk")/signing-certificate.txt"
     python3 "$root/android/verify-signing.py" "$(dirname "$apk")/signing-certificate.txt" "$root/android/signing-certificate.sha256"
 fi
+
+if [[ -n "${GITHUB_SHA:-}" && -n "${FOXHOLLOW_BUILD_NUMBER:-}" ]]; then
+    apk="$root/android/app/build/outputs/apk/debug/app-$abi-debug.apk"
+    version="dev-${GITHUB_SHA:0:8}"
+    code="$((1000000000 + FOXHOLLOW_BUILD_NUMBER))"
+    python3 "$root/android/verify-apk-version.py" "$apk" "$version" "$code" "$ANDROID_HOME/build-tools/35.0.0/aapt"
+    cp "$apk" "$(dirname "$apk")/foxhollow-$version-$code-$abi.apk"
+fi

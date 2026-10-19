@@ -127,3 +127,5 @@ add_test(NAME touch_ui_router_test COMMAND touch_ui_test routed)
 
 add_test(NAME launcher_resources COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_launcher_resources.py)
 add_test(NAME android_signing COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_android_signing.py)
+
+add_test(NAME apk_version COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_apk_version.py)

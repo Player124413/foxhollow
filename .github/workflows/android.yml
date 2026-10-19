@@ -83,11 +83,10 @@ jobs:
         shell: bash
       - uses: actions/upload-artifact@v7
         with:
-          name: foxhollow-android-arm64-debug
+          name: foxhollow-android-arm64-${{ github.sha }}-${{ github.run_number }}
           path: |
-            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/debug/foxhollow-*.apk
             android/app/build/outputs/apk/debug/signing-certificate.txt
-            android/app/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: error
       - uses: actions/cache/save@v6
         if: always() && steps.deps.outcome == 'success' && steps.deps.outputs.cache-hit != 'true'
@@ -104,6 +103,7 @@ jobs:
         with:
           name: android-test-reports
           path: |
+            android/app/build/outputs/apk/androidTest/debug/*.apk
             android/app/build/reports
             android/app/build/test-results
             android-build.log
