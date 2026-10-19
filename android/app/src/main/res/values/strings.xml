@@ -19,7 +19,7 @@
   <string name="touch_editor">Open controls editor at launch</string>
   <string name="touch_reset">Reset control layout</string>
   <string name="keep_screen_on">Keep screen on while playing</string>
-  <string name="cache_clear">Clear shader cache</string>
+  <string name="cache_clear">Clear shader and texture cache</string>
   <string name="settings_reset">Reset settings</string>
   <string name="confirm">Are you sure?</string>
   <string name="io_error">Could not access files</string>
@@ -56,4 +56,6 @@
     <item>Русский</item>
   </string-array>
   <string name="public_signing_notice">Public debug signing key: install updates only from a trusted source.</string>
+  <string name="etc2">ETC2 texture compression</string>
+  <string name="etc2_note">Compresses supported static CMPR/BC1 textures when the GPU supports ETC2. Uses a disk cache; first loading may take longer. Changes apply on the next launch.</string>
 </resources>

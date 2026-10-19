@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/richgel999/rg-etc1",
+  "revision": "701f354e19f69f2b7f79cc5c6fdde870467f01bb",
+  "sha256": {
+    "rg_etc1.h": "7a16b89b9fcd1b2be74e770d18493db43bf47c590bbddad379aba4757bda0585",
+    "rg_etc1.cpp": "9a6a117d18b9b590434e125f12438b997464a04ab6b3668a9001a8bfaf8bb2b0"
+  }
+}

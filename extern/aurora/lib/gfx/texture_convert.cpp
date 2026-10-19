@@ -1,4 +1,6 @@
 #include "texture_convert.hpp"
+#include "etc2.hpp"
+#include <cstdlib>
 
 #include "../internal.hpp"
 #include "../gx/gx_fmt.hpp"
@@ -572,8 +574,16 @@ static ByteBuffer BuildRGBA8FromBC1(uint32_t width, uint32_t height, uint32_t mi
   return buf;
 }
 
-ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) {
+ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data, bool allowEtc2) {
   ZoneScoped;
+  bool useEtc2 = false;
+#ifdef __ANDROID__
+  const char* option = std::getenv("FOXHOLLOW_ETC2");
+  useEtc2 = allowEtc2 && webgpu::g_etc2TexturesSupported && (!option || std::strcmp(option, "0") != 0) &&
+            (format == GX_TF_CMPR || format == GX_TF_BC1_PC) && etc2_eligible(width, height, mips);
+#else
+  (void)allowEtc2;
+#endif
   ByteBuffer converted;
   switch (format) {
     DEFAULT_FATAL("convert_texture: unknown texture format {}", format);
@@ -594,7 +604,7 @@ ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, ui
   case GX_TF_RGBA8_PC:
     return {.format = to_wgpu(format), .width = width, .height = height, .mips = mips};
   case GX_TF_BC1_PC:
-    if (uses_direct_texture_upload(format)) {
+    if (uses_direct_texture_upload(format) && !useEtc2) {
       return {.format = to_wgpu(format), .width = width, .height = height, .mips = mips};
     }
     converted = BuildRGBA8FromBC1(width, height, mips, data);
@@ -633,10 +643,21 @@ ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, ui
     converted = BuildRGBA8FromCMPR(width, height, mips, data);
     break;
   }
-  const auto wgpuFormat = to_wgpu(format);
+  auto wgpuFormat = format == GX_TF_BC1_PC ? wgpu::TextureFormat::RGBA8Unorm : to_wgpu(format);
   bool hasArbitraryMips = false;
   if (!is_pc_texture_format(format) && wgpuFormat == wgpu::TextureFormat::RGBA8Unorm && mips > 1) {
     hasArbitraryMips = arb_mip_check(width, height, mips, converted);
+  }
+  if (useEtc2) {
+    const char* cache = std::getenv("FOXHOLLOW_CACHE_DIR");
+    auto encoded = cached_etc2(width, height, mips, {converted.data(), converted.size()},
+                               cache && *cache ? std::filesystem::path(cache) / "etc2-v1" : std::filesystem::path{});
+    if (!encoded.data.empty()) {
+      wgpuFormat = encoded.alpha ? wgpu::TextureFormat::ETC2RGBA8Unorm : wgpu::TextureFormat::ETC2RGB8Unorm;
+      ByteBuffer compressed{encoded.data.size()};
+      std::memcpy(compressed.data(), encoded.data.data(), encoded.data.size());
+      converted = std::move(compressed);
+    }
   }
   return {
       .format = wgpuFormat,

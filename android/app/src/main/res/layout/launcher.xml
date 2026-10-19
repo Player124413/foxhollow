@@ -33,6 +33,8 @@
             <TextView style="@style/Label" android:text="@string/aspect" android:labelFor="@id/aspect" />
             <Spinner android:id="@+id/aspect" android:layout_width="match_parent" android:layout_height="48dp"
                 android:entries="@array/aspect_labels" />
+            <Switch android:id="@+id/etc2" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/etc2" />
+            <TextView style="@style/Label" android:text="@string/etc2_note" />
             <Switch android:id="@+id/vsync" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/vsync" />
             <Switch android:id="@+id/fps" android:layout_width="match_parent" android:layout_height="56dp" android:text="@string/fps" />
             <TextView style="@style/Label" android:text="@string/performance_note" />

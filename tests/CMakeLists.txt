@@ -16,7 +16,15 @@ FetchContent_Declare(json
     URL https://codeload.github.com/nlohmann/json/tar.gz/refs/tags/v3.12.0
     DOWNLOAD_EXTRACT_TIMESTAMP FALSE
     SOURCE_SUBDIR _headers_only)
-FetchContent_MakeAvailable(SDL imgui json)
+FetchContent_Declare(xxhash
+    URL https://codeload.github.com/Cyan4973/xxHash/tar.gz/refs/tags/v0.8.3
+    DOWNLOAD_EXTRACT_TIMESTAMP FALSE
+    SOURCE_SUBDIR _headers_only)
+FetchContent_MakeAvailable(SDL imgui json xxhash)
+add_library(etc1_test_vendor STATIC ../extern/aurora/extern/rg_etc1/rg_etc1.cpp)
+add_executable(etc2_test etc2_test.cpp ../extern/aurora/lib/gfx/etc2.cpp)
+target_include_directories(etc2_test PRIVATE ${xxhash_SOURCE_DIR})
+target_link_libraries(etc2_test PRIVATE etc1_test_vendor)
 add_library(imgui_test STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp ${imgui_SOURCE_DIR}/imgui_tables.cpp)
@@ -50,7 +58,7 @@ target_compile_definitions(touch_input_test PRIVATE TARGET_PC)
 target_include_directories(touch_input_test PRIVATE
     ../port/include ../extern/aurora/include ${sdl_SOURCE_DIR}/include ${imgui_SOURCE_DIR} ${json_SOURCE_DIR}/include)
 option(FOXHOLLOW_TEST_SANITIZERS "FOXHOLLOW_TEST_SANITIZERS" ON)
-foreach(target IN ITEMS touch_model_test touch_input_test touch_ui_test cutscene_test cutscene_playback_test config_android_test config_test network_disabled_test imgui_test)
+foreach(target IN ITEMS etc2_test touch_model_test touch_input_test touch_ui_test cutscene_test cutscene_playback_test config_android_test config_test network_disabled_test imgui_test)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Werror -UNDEBUG -ffunction-sections -fdata-sections)
     target_link_options(${target} PRIVATE -Wl,--gc-sections)
     if (FOXHOLLOW_TEST_SANITIZERS)

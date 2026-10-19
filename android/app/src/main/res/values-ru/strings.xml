@@ -19,7 +19,7 @@
   <string name="touch_editor">Открыть редактор управления при запуске</string>
   <string name="touch_reset">Сбросить раскладку управления</string>
   <string name="keep_screen_on">Не выключать экран во время игры</string>
-  <string name="cache_clear">Очистить кэш шейдеров</string>
+  <string name="cache_clear">Очистить кэш шейдеров и текстур</string>
   <string name="settings_reset">Сбросить настройки</string>
   <string name="confirm">Подтвердить?</string>
   <string name="io_error">Ошибка доступа к файлам</string>
@@ -56,4 +56,6 @@
     <item>Русский</item>
   </string-array>
   <string name="public_signing_notice">Публичный debug-ключ подписи: устанавливайте обновления только из доверенного источника.</string>
+  <string name="etc2">Сжатие текстур ETC2</string>
+  <string name="etc2_note">Сжатие подходящих статических текстур CMPR/BC1 при поддержке ETC2 видеочипом. Используется дисковый кэш; первая загрузка может быть дольше. Изменения применяются при следующем запуске.</string>
 </resources>

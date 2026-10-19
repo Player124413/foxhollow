@@ -38,6 +38,7 @@ final class Settings {
             .putExtra("aspect", ASPECTS[index("aspect", ASPECTS.length, 0)])
             .putExtra("volume", index("volume", 101, 100))
             .putExtra("vsync", flag("vsync", true))
+            .putExtra("etc2", flag("etc2", true))
             .putExtra("fps", flag("fps", false))
             .putExtra("touch", flag("touch", true))
             .putExtra("editor", flag("editor", false))

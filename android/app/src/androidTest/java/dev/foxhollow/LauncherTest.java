@@ -46,6 +46,7 @@ public final class LauncherTest {
         assertEquals(100, intent.getIntExtra("volume", -1));
         assertTrue(intent.getBooleanExtra("touch", false));
         assertTrue(intent.getBooleanExtra("vsync", false));
+        assertTrue(intent.getBooleanExtra("etc2", false));
         assertFalse(intent.getBooleanExtra("editor", true));
     }
 
@@ -63,11 +64,13 @@ public final class LauncherTest {
         settings.put("scale", 0);
         settings.put("volume", 25);
         settings.put("touch", false);
+        settings.put("etc2", false);
         Intent intent = new Settings(context).gameIntent(context);
         assertEquals("opengles", intent.getStringExtra("renderer"));
         assertEquals("0.75", intent.getStringExtra("scale"));
         assertEquals(25, intent.getIntExtra("volume", -1));
         assertFalse(intent.getBooleanExtra("touch", true));
+        assertFalse(intent.getBooleanExtra("etc2", true));
     }
 
     @Test public void corruptedSettingsFallBack() {

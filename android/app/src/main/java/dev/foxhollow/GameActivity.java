@@ -32,6 +32,7 @@ public final class GameActivity extends BorealisActivity {
         SDLActivity.nativeSetenv("FOXHOLLOW_RENDER_SCALE", allowed(intent.getStringExtra("scale"), Settings.SCALES, "1"));
         SDLActivity.nativeSetenv("FOXHOLLOW_SCREEN_STYLE", allowed(intent.getStringExtra("aspect"), Settings.ASPECTS, "narrow"));
         SDLActivity.nativeSetenv("FOXHOLLOW_FRAME_LIMIT", "60");
+        SDLActivity.nativeSetenv("FOXHOLLOW_ETC2", intent.getBooleanExtra("etc2", true) ? "1" : "0");
         SDLActivity.nativeSetenv("FOXHOLLOW_VSYNC", intent.getBooleanExtra("vsync", true) ? "1" : "0");
         SDLActivity.nativeSetenv("FOXHOLLOW_AUDIO_GAIN", Float.toString(Math.max(0, Math.min(100, intent.getIntExtra("volume", 100))) / 100f));
         boolean editor = intent.getBooleanExtra("editor", false);

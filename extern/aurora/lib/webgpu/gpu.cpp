@@ -70,6 +70,7 @@ bool g_hasCoreFeatures = false;
 bool g_dualSourceBlendingSupported = false;
 bool g_bcTexturesSupported = false;
 bool g_astcTexturesSupported = false;
+bool g_etc2TexturesSupported = false;
 bool g_textureComponentSwizzleSupported = false;
 static std::atomic_bool g_initialized = false;
 static std::atomic_bool g_vsyncEnabled = true;
@@ -939,6 +940,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
     g_hasCoreFeatures = false;
     g_bcTexturesSupported = false;
     g_astcTexturesSupported = false;
+    g_etc2TexturesSupported = false;
     g_textureComponentSwizzleSupported = false;
     g_dualSourceBlendingSupported = false;
     wgpu::SupportedFeatures supportedFeatures;
@@ -946,7 +948,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
     for (size_t i = 0; i < supportedFeatures.featureCount; ++i) {
       const auto feature = supportedFeatures.features[i];
       if (feature == wgpu::FeatureName::CoreFeaturesAndLimits || feature == wgpu::FeatureName::TextureCompressionBC ||
-          feature == wgpu::FeatureName::TextureCompressionASTC ||
+          feature == wgpu::FeatureName::TextureCompressionASTC || feature == wgpu::FeatureName::TextureCompressionETC2 ||
           feature == wgpu::FeatureName::TextureComponentSwizzle || feature == wgpu::FeatureName::DualSourceBlending) {
         if (feature == wgpu::FeatureName::CoreFeaturesAndLimits) {
           g_hasCoreFeatures = true;
@@ -954,6 +956,8 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
           g_bcTexturesSupported = true;
         } else if (feature == wgpu::FeatureName::TextureCompressionASTC) {
           g_astcTexturesSupported = true;
+        } else if (feature == wgpu::FeatureName::TextureCompressionETC2) {
+          g_etc2TexturesSupported = true;
         } else if (feature == wgpu::FeatureName::TextureComponentSwizzle) {
           g_textureComponentSwizzleSupported = true;
         } else if (feature == wgpu::FeatureName::DualSourceBlending) {

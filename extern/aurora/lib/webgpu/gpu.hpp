@@ -59,6 +59,7 @@ extern wgpu::AdapterInfo g_adapterInfo;
 extern bool g_hasCoreFeatures;
 extern bool g_bcTexturesSupported;
 extern bool g_astcTexturesSupported;
+extern bool g_etc2TexturesSupported;
 extern bool g_textureComponentSwizzleSupported;
 extern bool g_dualSourceBlendingSupported;
 

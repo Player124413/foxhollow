@@ -486,6 +486,13 @@ constexpr bool is_unsupported_texture_format(wgpu::TextureFormat format) {
   case wgpu::TextureFormat::BC7RGBAUnorm:
   case wgpu::TextureFormat::BC7RGBAUnormSrgb:
     return !webgpu::g_bcTexturesSupported;
+  case wgpu::TextureFormat::ETC2RGB8Unorm:
+  case wgpu::TextureFormat::ETC2RGB8UnormSrgb:
+  case wgpu::TextureFormat::ETC2RGB8A1Unorm:
+  case wgpu::TextureFormat::ETC2RGB8A1UnormSrgb:
+  case wgpu::TextureFormat::ETC2RGBA8Unorm:
+  case wgpu::TextureFormat::ETC2RGBA8UnormSrgb:
+    return !webgpu::g_etc2TexturesSupported;
   case wgpu::TextureFormat::ASTC4x4Unorm:
   case wgpu::TextureFormat::ASTC4x4UnormSrgb:
   case wgpu::TextureFormat::ASTC5x4Unorm:

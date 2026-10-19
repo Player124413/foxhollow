@@ -99,6 +99,7 @@ public final class LauncherActivity extends Activity {
         bindSpinner(R.id.render_scale, "scale", Settings.SCALES.length, 1);
         bindSpinner(R.id.aspect, "aspect", Settings.ASPECTS.length, 0);
         bindSwitch(R.id.vsync, "vsync");
+        bindSwitch(R.id.etc2, "etc2");
         bindSwitch(R.id.fps, "fps", false);
         bindSwitch(R.id.touch, "touch");
         bindSwitch(R.id.touch_editor, "editor", false);
