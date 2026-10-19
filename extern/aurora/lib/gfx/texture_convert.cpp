@@ -580,7 +580,8 @@ ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, ui
 #ifdef __ANDROID__
   const char* option = std::getenv("FOXHOLLOW_ETC2");
   useEtc2 = allowEtc2 && webgpu::g_etc2TexturesSupported && (!option || std::strcmp(option, "0") != 0) &&
-            (format == GX_TF_CMPR || format == GX_TF_BC1_PC) && etc2_eligible(width, height, mips);
+            (format == GX_TF_CMPR || (format == GX_TF_BC1_PC && !webgpu::g_bcTexturesSupported)) &&
+            etc2_eligible(width, height, mips);
 #else
   (void)allowEtc2;
 #endif
