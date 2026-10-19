@@ -64,6 +64,27 @@ static void check_data(uint32_t size) {
     case 2: packed = {a[2], a[3], b[0], b[1]}; break;
     default: packed = {a[3], b[0], b[1], b[2]}; break;
     }
+    std::array<uint32_t, 2> pair{};
+    std::array<uint32_t, 3> triple{};
+    switch (component) {
+    case 0: pair = {a[0], a[1]}; triple = {a[0], a[1], a[2]}; break;
+    case 1: pair = {a[1], a[2]}; triple = {a[1], a[2], a[3]}; break;
+    case 2: pair = {a[2], a[3]}; triple = {a[2], a[3], b[0]}; break;
+    default: pair = {a[3], b[0]}; triple = {a[3], b[0], b[1]}; break;
+    }
+    assert(std::equal(pair.begin(), pair.end(), packed.begin()));
+    assert(std::equal(triple.begin(), triple.end(), packed.begin()));
+    for (uint32_t sub : {0u, 2u}) {
+      for (uint32_t c = 0; c < 3; ++c) {
+        const uint32_t shift = sub + c * 2;
+        const uint32_t actual = (pair[shift / 4] >> ((shift % 4) * 8)) & 65535u;
+        uint16_t expected = 0;
+        if ((word * 4 + shift + 2) <= size) {
+          std::memcpy(&expected, staging.data() + word * 4 + shift, 2);
+        }
+        assert(actual == expected);
+      }
+    }
     for (uint32_t i = 0; i < 4; ++i) {
       uint32_t expected = 0;
       if (word + i < size / 4) {
@@ -99,6 +120,9 @@ int main(int argc, char** argv) {
   replace_all(shader, "{12}", std::string(aurora::gx::vertex_load_word_source(true)));
   replace_all(shader, "{13}", std::string(aurora::gx::vertex_float_fast_path(true, 3)));
   replace_all(shader, "{14}", std::string(aurora::gx::vertex_float_fast_path(true, 4)));
+  replace_all(shader, "{15}", std::string(aurora::gx::vertex_float_fast_path(true, 2)));
+  replace_all(shader, "{16}", std::string(aurora::gx::vertex_short_fast_path(true, 2)));
+  replace_all(shader, "{17}", std::string(aurora::gx::vertex_short_fast_path(true, 3)));
   shader += R"(
 @group(0) @binding(0) var<storage, read> vbuf: array<u32>;
 @group(0) @binding(1) var<storage, read> abuf: array<u32>;
@@ -107,7 +131,9 @@ int main(int argc, char** argv) {
   let pos = fetch_f32_3(&abuf, idx * 12u, false);
   let color = fetch_rgb565(&vbuf, vidx * 2u, false);
   let nrm = fetch_s16_3(&abuf, idx * 6u, 14u, false);
-  return vec4f(pos + color.xyz + nrm, 1.0);
+  let uv = raw_fetch_f32_2(&abuf, idx * 8u, false);
+  let shorts = raw_fetch_u16_2(&abuf, idx * 4u, false);
+  return vec4f(pos + color.xyz + nrm + vec3f(uv, f32(shorts.x)), 1.0);
 }
 @fragment fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   return vec4f(bitcast<f32>(load_word(&abuf, u32(pos.x))));
@@ -124,6 +150,9 @@ int main(int argc, char** argv) {
   assert(shader.find("load_texel(p, word_idx >> 2u)[word_idx & 3u]") != std::string::npos);
   assert(shader.find("texel_idx % dims.x") == std::string::npos);
   assert(shader.find("texel_idx / dims.x") == std::string::npos);
+  assert(aurora::gx::vertex_float_fast_path(false, 2).empty());
+  assert(aurora::gx::vertex_short_fast_path(false, 2).empty());
+  assert(aurora::gx::vertex_short_fast_path(false, 3).empty());
   assert(aurora::gx::vertex_float_fast_path(false, 3).empty());
   assert(aurora::gx::vertex_float_fast_path(false, 4).empty());
   const std::string normal(aurora::gx::vertex_load_word_source(false));
