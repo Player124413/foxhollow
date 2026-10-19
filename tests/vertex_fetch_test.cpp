@@ -97,6 +97,14 @@ static void check_data(uint32_t size) {
 
 int main(int argc, char** argv) {
   assert(argc == 3);
+  for (uint32_t vertex : {0u, 1u, 2u, 4u, 16u}) {
+    for (uint32_t fragment : {0u, 1u, 4u, 16u}) {
+      assert(needs_texture_vertex_fetch(vertex, fragment, true));
+      assert(needs_texture_vertex_fetch(vertex, fragment, false) == (vertex < 2 || fragment < 1));
+    }
+  }
+  assert(needs_texture_vertex_fetch(4, 4, true));
+  assert(!needs_texture_vertex_fetch(4, 4, false));
   assert(needs_texture_vertex_fetch(0, 0));
   assert(needs_texture_vertex_fetch(0, 2));
   assert(needs_texture_vertex_fetch(1, 2));

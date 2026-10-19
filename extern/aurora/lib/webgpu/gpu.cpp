@@ -906,13 +906,21 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
       Log.error("Failed to query adapter limits");
       return false;
     }
+#ifdef __ANDROID__
+    const bool compatibilityProfile = g_backendType == wgpu::BackendType::OpenGLES;
+#else
+    constexpr bool compatibilityProfile = false;
+#endif
+    if (compatibilityProfile) {
+      Log.info("Android OpenGLES compatibility profile: texture vertices; dual-source blending disabled");
+    }
     g_textureVertexFetch = gfx::needs_texture_vertex_fetch(
         supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
-        supportedCompatibilityLimits.maxStorageBuffersInFragmentStage);
+        supportedCompatibilityLimits.maxStorageBuffersInFragmentStage, compatibilityProfile);
     Log.info("Vertex data path: {}; storage buffers vertex={}, fragment={}",
              g_textureVertexFetch ? "RGBA32Uint texture fetch" : "storage buffer fetch",
              supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
-             supportedCompatibilityLimits.maxStorageBuffersInFragmentStage);
+             supportedCompatibilityLimits.maxStorageBuffersInFragmentStage, compatibilityProfile);
     wgpu::CompatibilityModeLimits compatibilityModeLimits{wgpu::CompatibilityModeLimits::Init{
         .maxStorageBuffersInVertexStage = g_textureVertexFetch ? 0u : 2u,
         .maxStorageBuffersInFragmentStage = g_textureVertexFetch ? 0u : 1u,
@@ -960,6 +968,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
     g_adapter.GetFeatures(&supportedFeatures);
     for (size_t i = 0; i < supportedFeatures.featureCount; ++i) {
       const auto feature = supportedFeatures.features[i];
+      if (compatibilityProfile && feature == wgpu::FeatureName::DualSourceBlending) {
+        continue;
+      }
       if (feature == wgpu::FeatureName::CoreFeaturesAndLimits || feature == wgpu::FeatureName::TextureCompressionBC ||
           feature == wgpu::FeatureName::TextureCompressionASTC || feature == wgpu::FeatureName::TextureCompressionETC2 ||
           feature == wgpu::FeatureName::TextureComponentSwizzle || feature == wgpu::FeatureName::DualSourceBlending) {

@@ -7,8 +7,9 @@ inline constexpr uint32_t LinearTextureWidth = 256;
 inline constexpr uint32_t LinearTextureBytesPerTexel = 16;
 inline constexpr uint32_t LinearTextureBytesPerRow = LinearTextureWidth * LinearTextureBytesPerTexel;
 
-constexpr bool needs_texture_vertex_fetch(uint32_t vertexStorageBuffers, uint32_t fragmentStorageBuffers) {
-  return vertexStorageBuffers < 2 || fragmentStorageBuffers < 1;
+constexpr bool needs_texture_vertex_fetch(uint32_t vertexStorageBuffers, uint32_t fragmentStorageBuffers,
+                                          bool compatibilityProfile = false) {
+  return compatibilityProfile || vertexStorageBuffers < 2 || fragmentStorageBuffers < 1;
 }
 
 struct LinearTextureCopyRange {
