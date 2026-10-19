@@ -337,12 +337,6 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
   }
 }
 
-constexpr uint64_t VertexStagingOffset = 0;
-constexpr uint64_t UniformStagingOffset = VertexStagingOffset + VertexBufferSize;
-constexpr uint64_t IndexStagingOffset = UniformStagingOffset + UniformBufferSize;
-constexpr uint64_t StorageStagingOffset = IndexStagingOffset + IndexBufferSize;
-constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBufferSize;
-
 constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~3u; }
 
 void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& frame, uint32_t& copied,

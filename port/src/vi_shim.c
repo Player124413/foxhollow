@@ -78,7 +78,7 @@ static void shutdown_and_exit(void) {
   fhModsShutdown();
   aurora_dvd_close();
   aurora_shutdown();
-  exit(0);
+  fhExitGameProcess();
 }
 
 static void pump_events(void) {

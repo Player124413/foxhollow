@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+void fhExitGameProcess(void);
 void fhRequestQuit(void);
 int fhQuitRequested(void);
 

@@ -21,6 +21,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <mutex>
 #include <optional>
@@ -42,6 +43,7 @@ namespace {
 constexpr Module Log{"aurora::gfx"};
 
 Resources g_resources;
+bool g_queueStaging = false;
 
 enum class BufferMapState {
   Unmapped,
@@ -216,6 +218,13 @@ void pace_frame_start() {
 }
 
 void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+  if (g_queueStaging) {
+    g_mappingStates[slot].store(BufferMapState::Mapped, std::memory_order_release);
+    if (releaseSlotOnCompletion) {
+      g_stagingSlots.release(slot);
+    }
+    return;
+  }
   auto expected = BufferMapState::Unmapped;
   if (!g_mappingStates[slot].compare_exchange_strong(expected, BufferMapState::Mapping, std::memory_order_acq_rel,
                                                      std::memory_order_acquire)) {
@@ -384,6 +393,8 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
 }
 
 void initialize() {
+  g_queueStaging = webgpu::g_textureVertexFetch && webgpu::g_backendType == wgpu::BackendType::OpenGLES;
+  Log.info("Staging upload path: {}", g_queueStaging ? "queue writes" : "mapped buffers");
   g_frameIndex = 0;
   g_processEventsQueued.store(false, std::memory_order_release);
   g_lastPresentNs.store(0, std::memory_order_release);
@@ -430,7 +441,9 @@ void initialize() {
                "Shared Storage Buffer");
   for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
     const auto label = fmt::format("Staging Buffer {}", i);
-    createBuffer(g_stagingBuffers[i], wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc, StagingBufferSize,
+    const auto usage = wgpu::BufferUsage::CopySrc |
+                       (g_queueStaging ? wgpu::BufferUsage::CopyDst : wgpu::BufferUsage::MapWrite);
+    createBuffer(g_stagingBuffers[i], usage, StagingBufferSize,
                  label.c_str());
   }
   for (auto& state : g_mappingStates) {
@@ -645,7 +658,7 @@ bool begin_frame() {
   size_t bufferOffset = 0;
   const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
   const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-    if (size <= 0) {
+    if (size <= 0 || g_queueStaging) {
       return;
     }
     buf = ByteBuffer{static_cast<u8*>(stagingBuf.GetMappedRange(bufferOffset, size)), static_cast<size_t>(size)};
@@ -688,7 +701,31 @@ void end_frame(EndFrameCallback callback) {
   const size_t stagingSlot = frame.stagingBuffer;
   render_worker::enqueue_end_frame(frameId, [frameSlot, stagingSlot, callback = std::move(callback)]() mutable {
     auto& packet = g_framePackets[frameSlot];
-    g_stagingBuffers[stagingSlot].Unmap();
+    const auto uploadStart = PresentClock::now();
+    if (g_queueStaging) {
+      const auto upload = [&](ByteBuffer& data, uint64_t offset, uint64_t capacity) {
+        if (data.empty()) {
+          return;
+        }
+        const auto size = data.size();
+        const auto padded = staging_upload_size(size);
+        CHECK(padded <= capacity, "Staging upload overflow: {} > {}", padded, capacity);
+        data.reserve_extra(padded - size);
+        std::memset(data.data() + size, 0, padded - size);
+        g_queue.WriteBuffer(g_stagingBuffers[stagingSlot], offset, data.data(), padded);
+      };
+      upload(packet.verts, VertexStagingOffset, VertexBufferSize);
+      upload(packet.uniforms, UniformStagingOffset, UniformBufferSize);
+      upload(packet.indices, IndexStagingOffset, IndexBufferSize);
+      upload(packet.storage, StorageStagingOffset, StorageBufferSize);
+      if constexpr (UseTextureBuffer) {
+        upload(packet.textureUpload, TextureUploadStagingOffset, TextureUploadSize);
+      }
+    } else {
+      g_stagingBuffers[stagingSlot].Unmap();
+    }
+    [[maybe_unused]] const double uploadMs = std::chrono::duration<double, std::milli>(PresentClock::now() - uploadStart).count();
+    TracyPlot("aurora: stagingUploadMs", uploadMs);
     g_mappingStates[stagingSlot].store(BufferMapState::Unmapped, std::memory_order_release);
     auto encoder = std::move(packet.encoder);
     const auto stats = packet.stats;
@@ -713,12 +750,14 @@ void end_frame(EndFrameCallback callback) {
     if (submitEnd - lastPerformanceLog >= std::chrono::seconds{5}) {
       lastPerformanceLog = submitEnd;
       Log.info("Performance: present_ms={:.2f} record_ms={:.2f} submit_ms={:.2f} draws={} merged={} "
-               "vertex_bytes={} storage_bytes={} texture_upload_bytes={} vertex_path={}",
+               "vertex_bytes={} storage_bytes={} texture_upload_bytes={} vertex_path={} uniform_bytes={} "
+               "upload_ms={:.2f} staging={}",
                static_cast<double>(g_presentPeriodNs.load(std::memory_order_acquire)) / 1'000'000.0,
                static_cast<double>(g_cpuFrameTimeNs.load(std::memory_order_acquire)) / 1'000'000.0,
                std::chrono::duration<double, std::milli>(submitEnd - submitStart).count(),
                stats.drawCallCount, stats.mergedDrawCallCount, stats.lastVertSize, stats.lastStorageSize,
-               stats.lastTextureUploadSize, webgpu::g_textureVertexFetch ? "texture" : "storage");
+               stats.lastTextureUploadSize, webgpu::g_textureVertexFetch ? "texture" : "storage",
+               stats.lastUniformSize, uploadMs, g_queueStaging ? "queue" : "mapped");
     }
 #endif
     g_frameSlots.release(frameSlot);
