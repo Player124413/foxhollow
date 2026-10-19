@@ -701,9 +701,26 @@ void end_frame(EndFrameCallback callback) {
     g_resources.stats.lastIndexSize = stats.lastIndexSize;
     g_resources.stats.lastStorageSize = stats.lastStorageSize;
     g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
+#ifdef __ANDROID__
+    const auto submitStart = PresentClock::now();
+#endif
     if (callback) {
       callback(encoder, std::move(afterSubmitCallbacks));
     }
+#ifdef __ANDROID__
+    const auto submitEnd = PresentClock::now();
+    static auto lastPerformanceLog = PresentClock::time_point{};
+    if (submitEnd - lastPerformanceLog >= std::chrono::seconds{5}) {
+      lastPerformanceLog = submitEnd;
+      Log.info("Performance: present_ms={:.2f} record_ms={:.2f} submit_ms={:.2f} draws={} merged={} "
+               "vertex_bytes={} storage_bytes={} texture_upload_bytes={} vertex_path={}",
+               static_cast<double>(g_presentPeriodNs.load(std::memory_order_acquire)) / 1'000'000.0,
+               static_cast<double>(g_cpuFrameTimeNs.load(std::memory_order_acquire)) / 1'000'000.0,
+               std::chrono::duration<double, std::milli>(submitEnd - submitStart).count(),
+               stats.drawCallCount, stats.mergedDrawCallCount, stats.lastVertSize, stats.lastStorageSize,
+               stats.lastTextureUploadSize, webgpu::g_textureVertexFetch ? "texture" : "storage");
+    }
+#endif
     g_frameSlots.release(frameSlot);
     expire_cached_bind_groups();
     map_staging_buffer(stagingSlot, true);

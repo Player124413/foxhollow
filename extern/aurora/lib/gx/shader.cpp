@@ -1705,7 +1705,7 @@ fn raw_fetch_f32_2(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec2
   );
 }}
 
-fn raw_fetch_f32_3(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec3f {{
+fn raw_fetch_f32_3(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec3f {{{13}
   return vec3f(
     load_f32(p, byte_off + 0u, le),
     load_f32(p, byte_off + 4u, le),
@@ -1713,7 +1713,7 @@ fn raw_fetch_f32_3(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec3
   );
 }}
 
-fn raw_fetch_f32_4(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec4f {{
+fn raw_fetch_f32_4(p: ptr<storage, array<u32>>, byte_off: u32, le: bool) -> vec4f {{{14}
   return vec4f(
     load_f32(p, byte_off + 0u, le),
     load_f32(p, byte_off + 4u, le),
@@ -1921,7 +1921,9 @@ fn fs_main(in: VertexOutput) -> {10} {{{6}{5}{11}
 )""",
                   uniBufAttrs, texBindings, vtxOutAttrs, vtxInAttrs, vtxXfrAttrs, fragmentFn, fragmentFnPre,
                   vtxXfrAttrsPre, uniformPre, fragmentOutput, fragmentOutputType, fragmentReturn,
-                  vertex_load_word_source(webgpu::g_textureVertexFetch));
+                  vertex_load_word_source(webgpu::g_textureVertexFetch),
+                  vertex_float_fast_path(webgpu::g_textureVertexFetch, 3),
+                  vertex_float_fast_path(webgpu::g_textureVertexFetch, 4));
   if (webgpu::g_textureVertexFetch) {
     use_texture_vertex_fetch(shaderSource);
   }

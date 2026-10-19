@@ -44,12 +44,33 @@ static void check_data(uint32_t size) {
   }
   for (uint32_t word = 0; word < size / 4; ++word) {
     const uint32_t texel = word / 4;
-    const uint32_t x = texel % LinearTextureWidth;
-    const uint32_t y = texel / LinearTextureWidth;
-    const uint32_t component = word % 4;
+    const uint32_t x = texel & 255u;
+    const uint32_t y = texel >> 8u;
+    const uint32_t component = word & 3u;
+    assert(x == texel % LinearTextureWidth);
+    assert(y == texel / LinearTextureWidth);
     const uint32_t byte = (y * LinearTextureWidth + x) * LinearTextureBytesPerTexel + component * 4;
     assert(byte == word * 4);
     assert(std::memcmp(texture.data() + byte, staging.data() + word * 4, 4) == 0);
+    std::array<uint32_t, 4> a{}, b{}, packed{};
+    const uint32_t base = (word >> 2u) * 16u;
+    std::memcpy(a.data(), texture.data() + base, 16);
+    if (base + 16 < size) {
+      std::memcpy(b.data(), texture.data() + base + 16, 16);
+    }
+    switch (component) {
+    case 0: packed = a; break;
+    case 1: packed = {a[1], a[2], a[3], b[0]}; break;
+    case 2: packed = {a[2], a[3], b[0], b[1]}; break;
+    default: packed = {a[3], b[0], b[1], b[2]}; break;
+    }
+    for (uint32_t i = 0; i < 4; ++i) {
+      uint32_t expected = 0;
+      if (word + i < size / 4) {
+        std::memcpy(&expected, staging.data() + (word + i) * 4, 4);
+      }
+      assert(packed[i] == expected);
+    }
   }
 }
 
@@ -76,6 +97,8 @@ int main(int argc, char** argv) {
   replace_all(shader, "{{", "{");
   replace_all(shader, "}}", "}");
   replace_all(shader, "{12}", std::string(aurora::gx::vertex_load_word_source(true)));
+  replace_all(shader, "{13}", std::string(aurora::gx::vertex_float_fast_path(true, 3)));
+  replace_all(shader, "{14}", std::string(aurora::gx::vertex_float_fast_path(true, 4)));
   shader += R"(
 @group(0) @binding(0) var<storage, read> vbuf: array<u32>;
 @group(0) @binding(1) var<storage, read> abuf: array<u32>;
@@ -98,7 +121,11 @@ int main(int argc, char** argv) {
   assert(shader.find("arrayLength") == std::string::npos);
   assert(shader.find("{12}") == std::string::npos);
   assert(shader.find("fn fetch_rgba8(p: texture_2d<u32>") != std::string::npos);
-  assert(shader.find("textureLoad(p, coord, 0)[word_idx % 4u]") != std::string::npos);
+  assert(shader.find("load_texel(p, word_idx >> 2u)[word_idx & 3u]") != std::string::npos);
+  assert(shader.find("texel_idx % dims.x") == std::string::npos);
+  assert(shader.find("texel_idx / dims.x") == std::string::npos);
+  assert(aurora::gx::vertex_float_fast_path(false, 3).empty());
+  assert(aurora::gx::vertex_float_fast_path(false, 4).empty());
   const std::string normal(aurora::gx::vertex_load_word_source(false));
   assert(normal.find("arrayLength(p)") != std::string::npos);
   assert(normal.find("ptr<storage") != std::string::npos);
