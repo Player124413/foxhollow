@@ -917,7 +917,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
     g_textureVertexFetch = gfx::needs_texture_vertex_fetch(
         supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
         supportedCompatibilityLimits.maxStorageBuffersInFragmentStage, compatibilityProfile);
-    Log.info("Vertex data path: {}; storage buffers vertex={}, fragment={}",
+    Log.info("Vertex data path: {}; storage buffers vertex={}, fragment={}; compatibility_profile={}",
              g_textureVertexFetch ? "RGBA32Uint texture fetch" : "storage buffer fetch",
              supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
              supportedCompatibilityLimits.maxStorageBuffersInFragmentStage, compatibilityProfile);
