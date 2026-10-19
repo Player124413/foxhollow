@@ -8,6 +8,7 @@
 #include "foxhollow_autosave.h"
 #include "foxhollow_compat.h"
 #include "foxhollow_config.h"
+#include "foxhollow_frame_pacing.h"
 #include "foxhollow_mods.h"
 #include "foxhollow_quit.h"
 #include "foxhollow_splash.h"
@@ -44,31 +45,15 @@ enum { VI_RETRACE_DEFAULT_HZ = 60 };
 
 static void wait_for_retrace_deadline(void) {
   const int limit = fhConfigFrameLimit();
-  Uint64 periodNs;
-  Uint64 now;
-
-  if (limit == 0) {
-    sNextRetraceNs = 0;
-    return;
-  }
-
-  periodNs = SDL_NS_PER_SECOND / (Uint64)(limit > 0 ? limit : VI_RETRACE_DEFAULT_HZ);
-  now = SDL_GetTicksNS();
-
-  if (sNextRetraceNs == 0) {
-    sNextRetraceNs = now + periodNs;
-  } else if (now >= sNextRetraceNs + periodNs) {
-    /* Do not run several retraces back-to-back after a long host stall. */
-    sNextRetraceNs = now + periodNs;
-  }
-
-  const Uint64 deadline = sNextRetraceNs;
-  sNextRetraceNs += periodNs;
-  if (now < deadline) {
+  const uint64_t period = limit == 0 ? 0 : SDL_NS_PER_SECOND / (uint64_t)(limit > 0 ? limit : VI_RETRACE_DEFAULT_HZ);
+  uint64_t next = sNextRetraceNs;
+  const uint64_t delay = fhFramePacingDelay(SDL_GetTicksNS(), period, &next);
+  sNextRetraceNs = next;
+  if (delay != 0) {
 #if defined(__ANDROID__)
-    SDL_DelayNS(deadline - now);
+    SDL_DelayNS(delay);
 #else
-    SDL_DelayPrecise(deadline - now);
+    SDL_DelayPrecise(delay);
 #endif
   }
 }

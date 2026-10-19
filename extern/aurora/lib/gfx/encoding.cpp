@@ -2,6 +2,7 @@
 
 #include "frame.hpp"
 #include "linear_texture.hpp"
+#include "state_cache.hpp"
 
 #include "clear.hpp"
 #include "depth_peek.hpp"
@@ -35,6 +36,7 @@ using webgpu::g_queue;
 namespace {
 constexpr Module Log{"aurora::gfx"};
 WGPURenderPipeline g_currentPipeline = nullptr;
+StateCache<WGPUBindGroup> g_textureGroupCache;
 
 void apply_viewport(const wgpu::RenderPassEncoder& pass, const Viewport& vp) {
   const auto depth = gx::viewport_depth(vp.znear, vp.zfar, gx::UseReversedZ);
@@ -109,6 +111,7 @@ void execute_encoder_task(wgpu::CommandEncoder& cmd, FramePacket& frame, const E
 void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, RenderPass& passInfo) {
   ZoneScoped;
   g_currentPipeline = nullptr;
+  g_textureGroupCache.invalidate();
 #ifdef AURORA_GFX_DEBUG_GROUPS
   std::vector<std::string> lastDebugGroupStack;
 #endif
@@ -119,7 +122,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
 
   // Bind bind group for the whole pass
   pass.SetBindGroup(0, resources().staticBindGroup);
-  pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
+  bind_texture_group(gx::g_emptyTextureBindGroup, pass);
 
   for (auto& cmd : passInfo.commands) {
 #ifdef AURORA_GFX_DEBUG_GROUPS
@@ -161,9 +164,10 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
     } break;
     case CommandType::CustomDraw: {
       render_custom_draw(cmd.data.customDraw, pass, passInfo);
+      g_textureGroupCache.invalidate();
       g_currentPipeline = nullptr;
       pass.SetBindGroup(0, resources().staticBindGroup);
-      pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
+      bind_texture_group(gx::g_emptyTextureBindGroup, pass);
       if (hasViewport) {
         apply_viewport(pass, currentViewport);
       }
@@ -482,6 +486,16 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
   }
 }
 } // namespace detail
+
+void bind_texture_group(const wgpu::BindGroup& group, const wgpu::RenderPassEncoder& pass) {
+#ifdef AURORA_ENABLE_RMLUI
+  pass.SetBindGroup(2, group);
+#else
+  if (g_textureGroupCache.update(group.Get())) {
+    pass.SetBindGroup(2, group);
+  }
+#endif
+}
 
 void bind_pipeline(const wgpu::RenderPipeline& pipeline, const wgpu::RenderPassEncoder& pass) {
   if (pipeline.Get() == g_currentPipeline) {
