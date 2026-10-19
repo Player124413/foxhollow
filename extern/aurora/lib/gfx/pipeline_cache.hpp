@@ -43,4 +43,13 @@ PipelineRef find_pipeline(const rmlui::PipelineConfig& config);
 
 bool get_pipeline(PipelineRef ref, CompiledPipeline& pipeline);
 
+struct PipelineDiagnostics {
+  uint64_t ready = 0;
+  uint64_t failed = 0;
+  uint64_t pending = 0;
+  uint64_t hits = 0;
+  uint64_t misses = 0;
+};
+PipelineDiagnostics pipeline_diagnostics();
+
 } // namespace aurora::gfx

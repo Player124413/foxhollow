@@ -761,6 +761,7 @@ void end_frame(EndFrameCallback callback) {
     [[maybe_unused]] const auto opCount = packet.ops.size();
     auto encoder = std::move(packet.encoder);
     const auto stats = packet.stats;
+    [[maybe_unused]] const bool textureOnlyUploads = packet.textureOnlyUploads;
     auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
     packet = {};
     g_resources.stats.drawCallCount = stats.drawCallCount;
@@ -781,6 +782,9 @@ void end_frame(EndFrameCallback callback) {
     static auto lastPerformanceLog = PresentClock::time_point{};
     if (submitEnd - lastPerformanceLog >= std::chrono::seconds{5}) {
       lastPerformanceLog = submitEnd;
+      const auto pipelines = pipeline_diagnostics();
+      Log.info("Pipeline state: ready={} failed={} pending={} hits={} misses={}",
+               pipelines.ready, pipelines.failed, pipelines.pending, pipelines.hits, pipelines.misses);
       Log.info("Performance: present_ms={:.2f} record_ms={:.2f} submit_ms={:.2f} draws={} merged={} "
                "vertex_bytes={} storage_bytes={} texture_upload_bytes={} vertex_path={} uniform_bytes={} "
                "upload_ms={:.2f} staging={} batched={} texture_only_uploads={} ops={} encode_ms={:.2f} "
@@ -790,7 +794,7 @@ void end_frame(EndFrameCallback callback) {
                std::chrono::duration<double, std::milli>(submitEnd - submitStart).count(),
                stats.drawCallCount, stats.mergedDrawCallCount, stats.lastVertSize, stats.lastStorageSize,
                stats.lastTextureUploadSize, webgpu::g_textureVertexFetch ? "texture" : "storage",
-               stats.lastUniformSize, uploadMs, g_queueStaging ? "queue" : "mapped", batched, packet.textureOnlyUploads, opCount, encodeMs,
+               stats.lastUniformSize, uploadMs, g_queueStaging ? "queue" : "mapped", batched, textureOnlyUploads, opCount, encodeMs,
                g_resources.timings.acquireMs, g_resources.timings.finishMs,
                g_resources.timings.submitMs, g_resources.timings.presentMs);
     }

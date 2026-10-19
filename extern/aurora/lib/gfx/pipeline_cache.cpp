@@ -1,4 +1,6 @@
 #include "pipeline_cache.hpp"
+#include "pipeline_compile_policy.hpp"
+#include "render_worker.hpp"
 
 #include "clear.hpp"
 #include "frame_packet.hpp"
@@ -73,6 +75,9 @@ struct SdlVfsSqliteFile {
 
 static std::mutex g_pipelineMutex;
 static bool g_hasPipelineThread = false;
+static bool g_renderThreadPipelines = false;
+static uint64_t g_pipelineHits = 0;
+static uint64_t g_pipelineMisses = 0;
 static size_t g_pipelinesPerFrame = 0;
 // For synchronous pipeline fallback (OpenGL)
 #ifdef NDEBUG
@@ -454,7 +459,7 @@ static PipelineRef find_pipeline_impl(PipelineRef runtimeKey, NewPipelineCallbac
                                       PipelinePriority priority = PipelinePriority::Normal) {
   ZoneScoped;
 
-  const bool blocking = priority == PipelinePriority::Blocking;
+  const bool blocking = priority == PipelinePriority::Blocking && !g_renderThreadPipelines;
   bool notifyWorker = false;
   bool pipelineReady = false;
   bool createdPipeline = false;
@@ -481,7 +486,8 @@ static PipelineRef find_pipeline_impl(PipelineRef runtimeKey, NewPipelineCallbac
         promote_pending_pipeline(runtimeKey, priority);
         notifyWorker = priority != PipelinePriority::Background;
       }
-    } else if (!g_hasPipelineThread && (blocking || g_pipelinesPerFrame < BuildPipelinesPerFrame)) {
+    } else if (compile_pipeline_inline(g_hasPipelineThread, g_renderThreadPipelines, blocking,
+                                       g_pipelinesPerFrame, BuildPipelinesPerFrame)) {
       auto result = cb();
       pipelineCount = result.pipeline_count();
       g_pipelines.try_emplace(runtimeKey, std::move(result));
@@ -1112,6 +1118,7 @@ void rebuild_pipeline_cache() {
   offscreen.sampleCount = 1;
   detail::finalize_render_target_layout(offscreen);
   g_pipelineLayoutKey = scene.key;
+  if (g_renderThreadPipelines) return;
 
   std::vector<KnownPipeline> known;
   {
@@ -1140,7 +1147,16 @@ void initialize_pipeline_cache() {
   g_pipelineThreadEnd = false;
   g_gpuCachePrunePending = false;
 
-  if (webgpu::g_backendType == wgpu::BackendType::WebGPU) {
+#ifdef __ANDROID__
+  constexpr bool android = true;
+#else
+  constexpr bool android = false;
+#endif
+  g_renderThreadPipelines = render_thread_pipeline_compilation(android, webgpu::g_backendType == wgpu::BackendType::OpenGLES);
+  g_pipelineHits = 0;
+  g_pipelineMisses = 0;
+  Log.info("Pipeline compilation: {}", g_renderThreadPipelines ? "render thread, on demand" : "default");
+  if (g_renderThreadPipelines || webgpu::g_backendType == wgpu::BackendType::WebGPU) {
     g_hasPipelineThread = false;
   } else {
     g_hasPipelineThread = true;
@@ -1149,7 +1165,7 @@ void initialize_pipeline_cache() {
 
   const size_t loadedCount = load_pipeline_cache();
   rebuild_pipeline_cache();
-  if (!g_pipelineCacheBroken && loadedCount > 0) {
+  if (!g_pipelineCacheBroken && loadedCount > 0 && !g_renderThreadPipelines) {
     g_gpuCachePrunePending = true;
   }
 
@@ -1184,7 +1200,7 @@ void shutdown_pipeline_cache() {
 }
 
 void begin_pipeline_frame() {
-  if (!g_hasPipelineThread) {
+  if (!g_hasPipelineThread && !g_renderThreadPipelines) {
     g_pipelinesPerFrame = 0;
   }
   if (g_pipelineLayoutKey != scene_render_target_layout().key) {
@@ -1193,19 +1209,52 @@ void begin_pipeline_frame() {
 }
 
 void end_pipeline_frame() {
-  if (!g_hasPipelineThread) {
+  if (!g_hasPipelineThread && !g_renderThreadPipelines) {
     pipeline_worker();
   }
 }
 
 bool get_pipeline(PipelineRef ref, CompiledPipeline& pipeline) {
+  if (g_renderThreadPipelines) {
+    AURORA_ASSERT(render_worker::is_worker_thread(), "GLES pipeline lookup must run on the render thread");
+    std::optional<PendingPipeline> pending;
+    {
+      std::lock_guard guard{g_pipelineMutex};
+      if (!g_pipelines.contains(ref)) {
+        pending = take_pending_pipeline(ref);
+        if (pending) g_pendingPipelines.insert(ref);
+      }
+    }
+    if (pending) {
+      auto result = pending->create();
+      const auto count = result.pipeline_count();
+      {
+        std::lock_guard guard{g_pipelineMutex};
+        g_pipelines.try_emplace(ref, std::move(result));
+        g_pendingPipelines.erase(ref);
+      }
+      notify_pipeline_ready(true, count);
+    }
+  }
   std::lock_guard guard{g_pipelineMutex};
   const auto it = g_pipelines.find(ref);
   if (it == g_pipelines.end() || !it->second.main) {
+    ++g_pipelineMisses;
     return false;
   }
+  ++g_pipelineHits;
   pipeline = it->second;
   return true;
+}
+
+PipelineDiagnostics pipeline_diagnostics() {
+  std::lock_guard guard{g_pipelineMutex};
+  PipelineDiagnostics state{.pending = g_pendingPipelines.size(), .hits = g_pipelineHits, .misses = g_pipelineMisses};
+  for (const auto& [key, pipeline] : g_pipelines) {
+    if (pipeline.main) ++state.ready;
+    else ++state.failed;
+  }
+  return state;
 }
 
 } // namespace aurora::gfx
