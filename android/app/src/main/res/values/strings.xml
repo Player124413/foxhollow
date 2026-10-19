@@ -55,4 +55,5 @@
     <item>English</item>
     <item>Русский</item>
   </string-array>
+  <string name="public_signing_notice">Public debug signing key: install updates only from a trusted source.</string>
 </resources>

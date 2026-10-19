@@ -55,4 +55,5 @@
     <item>English</item>
     <item>Русский</item>
   </string-array>
+  <string name="public_signing_notice">Публичный debug-ключ подписи: устанавливайте обновления только из доверенного источника.</string>
 </resources>

@@ -49,8 +49,6 @@ jobs:
         with:
           submodules: recursive
       - if: github.event_name != 'pull_request'
-        env:
-          FOXHOLLOW_ANDROID_SIGNING_BUNDLE: ${{ secrets.FOXHOLLOW_ANDROID_SIGNING_BUNDLE }}
         run: python3 android/prepare-signing.py
       - uses: actions/setup-java@v6
         with:

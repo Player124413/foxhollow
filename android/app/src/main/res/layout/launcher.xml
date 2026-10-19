@@ -46,6 +46,7 @@
             <Button android:id="@+id/cache_clear" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/cache_clear" />
             <Button android:id="@+id/settings_reset" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_reset" />
             <TextView style="@style/Label" android:text="@string/legal" />
+            <TextView style="@style/Label" android:text="@string/public_signing_notice" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
