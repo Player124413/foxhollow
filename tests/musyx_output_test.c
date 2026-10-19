@@ -11,6 +11,8 @@ static unsigned closed;
 static int active;
 static bool renderOk = true;
 static bool resumeOk = true;
+static AIDCallback dmaCallback;
+static int dmaRunning;
 static void (*enterEngine)(void);
 static void (*leaveEngine)(void);
 
@@ -59,6 +61,15 @@ bool SDL_PutAudioStreamData(SDL_AudioStream* stream, const void* data, int bytes
   }
   return true;
 }
+AIDCallback AIRegisterDMACallback(AIDCallback callback) {
+  AIDCallback old = dmaCallback; dmaCallback = callback; fhMusyxDMAChanged(callback); return old;
+}
+void AIStartDMA(void) { dmaRunning = 1; }
+void AIStopDMA(void) { dmaRunning = 0; }
+void AIInitDMA(uintptr_t address, u32 bytes) { assert(address && bytes == 640); }
+bool SDL_PauseAudioStreamDevice(SDL_AudioStream* stream) { assert(stream == output); active = 0; return true; }
+bool SDL_ClearAudioStream(SDL_AudioStream* stream) { assert(stream == output); return true; }
+static void movieDma(void) {}
 int main(void) {
   fhMusyxConfigure();
   fhMusyxStartOutput();
@@ -67,6 +78,10 @@ int main(void) {
   assert(samples == 0);
   for (int i = 0; i < 100; ++i) feed(NULL, output, 1280, 1280);
   assert(samples == 64000 && received == samples);
+  AIDCallback previous = AIRegisterDMACallback(movieDma);
+  assert(previous != NULL && dmaRunning && !active);
+  AIRegisterDMACallback(previous);
+  assert(!dmaRunning && active);
   renderOk = false;
   feed(NULL, output, 320, 320);
   fhMusyxStopOutput();

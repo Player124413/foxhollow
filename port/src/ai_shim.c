@@ -221,9 +221,12 @@ int fhAIPrepareStream(void* fileInfoPtr) {
   return 1;
 }
 
+void fhMusyxDMAChanged(AIDCallback callback);
+
 AIDCallback AIRegisterDMACallback(AIDCallback callback) {
   AIDCallback previous = sDmaCallback;
   sDmaCallback = callback;
+  fhMusyxDMAChanged(callback);
   return previous;
 }
 

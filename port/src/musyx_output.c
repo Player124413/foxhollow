@@ -1,4 +1,5 @@
 #include "foxhollow_config.h"
+#include <dolphin/ai.h>
 #include <musyx/musyx.h>
 #include <musyx/pc.h>
 #include <SDL3/SDL.h>
@@ -30,6 +31,27 @@ static void SDLCALL fhMusyxFeed(void* userdata, SDL_AudioStream* stream, int add
   }
 }
 
+static s16 sLegacyPcm[FH_MUSYX_CHUNK_FRAMES * FH_MUSYX_CHANNELS];
+
+static void fhMusyxLegacyDma(void) {
+  if (!sndPCRender(sLegacyPcm, FH_MUSYX_CHUNK_FRAMES)) memset(sLegacyPcm, 0, sizeof(sLegacyPcm));
+  AIInitDMA((uintptr_t)sLegacyPcm, sizeof(sLegacyPcm));
+}
+
+void fhMusyxDMAChanged(AIDCallback callback) {
+  if (callback == fhMusyxLegacyDma) {
+    AIStopDMA();
+    if (sMusyxOutput != NULL) SDL_ResumeAudioStreamDevice(sMusyxOutput);
+  } else {
+    if (sMusyxOutput != NULL) {
+      SDL_PauseAudioStreamDevice(sMusyxOutput);
+      SDL_ClearAudioStream(sMusyxOutput);
+    }
+    if (callback != NULL) AIStartDMA();
+    else AIStopDMA();
+  }
+}
+
 void fhMusyxConfigure(void) {
   SND_PC_CONFIG config = {FH_MUSYX_MIX_RATE, FH_MUSYX_CHANNELS};
   sMusyxConfigured = 0;
@@ -43,6 +65,7 @@ void fhMusyxConfigure(void) {
 }
 
 void fhMusyxStopOutput(void) {
+  AIRegisterDMACallback(NULL);
   if (sMusyxOutput != NULL) {
     SDL_DestroyAudioStream(sMusyxOutput);
     sMusyxOutput = NULL;
@@ -70,5 +93,6 @@ void fhMusyxStartOutput(void) {
     fhMusyxStopOutput();
     return;
   }
+  AIRegisterDMACallback(fhMusyxLegacyDma);
   fprintf(stderr, "[foxhollow] MusyX output: device-paced PCM rate=%d\n", FH_MUSYX_MIX_RATE);
 }
