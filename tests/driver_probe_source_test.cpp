@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
   for (unsigned mode = 0; mode < 3; ++mode) {
     const auto source = aurora::webgpu::driver_probe_source(mode);
     assert((source.find("var<immediate>") != std::string::npos) == (mode == 1));
-    assert((source.find("var<uniform>") != std::string::npos) == (mode == 2));
+    assert((source.find("var<uniform> params:") != std::string::npos) == (mode == 2));
     assert(source.find("262144u") != std::string::npos);
     std::ofstream out(std::string(argv[1]) + "/driver-probe-" + std::to_string(mode) + ".wgsl");
     out << source;

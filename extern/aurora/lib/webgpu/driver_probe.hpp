@@ -10,11 +10,17 @@ inline std::string driver_probe_source(unsigned mode) {
 struct Params { a: vec4u, b: vec4u, c: vec4u, d: vec4u };
 )";
   if (mode == 1) source += "var<immediate> params: Params;\n";
-  else if (mode == 2) source += "@group(0) @binding(0) var<uniform> params: Params;\n";
+  else if (mode == 2) source += "@group(0) @binding(1) var<uniform> params: Params;\n";
   else source += R"(
 const params = Params(vec4u(4093u,9u,32768u,0u),vec4u(64u,128u,256u,512u),
                       vec4u(1024u,2048u,4096u,8192u),vec4u(16384u,65536u,131072u,262144u));
 )";
+  if (mode == 1 || mode == 2) source += R"(
+struct Control { value: vec4u };
+@group(0) @binding(0) var<uniform> control: Control;
+fn control_valid() -> bool { return all(control.value == vec4u(42u,43u,44u,45u)); }
+)";
+  else source += "fn control_valid() -> bool { return true; }\n";
   source += R"(
 struct VertexOutput { @builtin(position) pos: vec4f, @location(0) color: vec4f };
 @vertex fn vs_main(@builtin(vertex_index) id: u32) -> VertexOutput {
@@ -22,7 +28,7 @@ struct VertexOutput { @builtin(position) pos: vec4f, @location(0) color: vec4f }
   let valid = all(params.a == vec4u(4093u,9u,32768u,0u)) &&
               all(params.b == vec4u(64u,128u,256u,512u)) &&
               all(params.c == vec4u(1024u,2048u,4096u,8192u)) &&
-              all(params.d == vec4u(16384u,65536u,131072u,262144u));
+              all(params.d == vec4u(16384u,65536u,131072u,262144u)) && control_valid();
   var out: VertexOutput;
   out.pos = vec4f(positions[id],0.5,1.0);
   out.color = select(vec4f(1.0,0.0,0.0,1.0),vec4f(64.0,128.0,192.0,255.0)/255.0,valid);
@@ -32,7 +38,7 @@ struct VertexOutput { @builtin(position) pos: vec4f, @location(0) color: vec4f }
   let valid = all(params.a == vec4u(4093u,9u,32768u,0u)) &&
               all(params.b == vec4u(64u,128u,256u,512u)) &&
               all(params.c == vec4u(1024u,2048u,4096u,8192u)) &&
-              all(params.d == vec4u(16384u,65536u,131072u,262144u));
+              all(params.d == vec4u(16384u,65536u,131072u,262144u)) && control_valid();
   return select(vec4f(1.0,0.0,0.0,1.0),in.color,valid);
 }
 )";

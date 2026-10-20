@@ -22,10 +22,11 @@ const values = new Uint32Array([
 ]);
 const alignment = d.limits.minUniformBufferOffsetAlignment;
 const uniform = d.createBuffer({
-  size: alignment + 64,
+  size: alignment + 3840,
   usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 d.queue.writeBuffer(uniform, alignment, values);
+d.queue.writeBuffer(uniform, 0, new Uint32Array([42, 43, 44, 45]));
 const index = d.createBuffer({
   size: 8,
   usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
@@ -54,12 +55,25 @@ for (let test = 0; test < 6; ++test) {
       {
         binding: 0,
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform", hasDynamicOffset: true, minBindingSize: 64 },
+        buffer: { type: "uniform", hasDynamicOffset: true, minBindingSize: 16 },
       },
+      ...(mode === 2
+        ? [
+            {
+              binding: 1,
+              visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+              buffer: {
+                type: "uniform",
+                hasDynamicOffset: true,
+                minBindingSize: 64,
+              },
+            },
+          ]
+        : []),
     ],
   });
   const layout = d.createPipelineLayout({
-    bindGroupLayouts: mode === 2 ? [bgl] : [],
+    bindGroupLayouts: mode !== 0 ? [bgl] : [],
     immediateSize: mode === 1 ? 64 : 0,
   });
   const format = test === 4 ? "depth24plus" : "depth32float";
@@ -110,12 +124,17 @@ for (let test = 0; test < 6; ++test) {
       : {}),
   });
   if (mode === 1) pass.setImmediates(0, values);
-  if (mode === 2) {
+  if (mode !== 0) {
     const bg = d.createBindGroup({
       layout: bgl,
-      entries: [{ binding: 0, resource: { buffer: uniform, size: 64 } }],
+      entries: [
+        { binding: 0, resource: { buffer: uniform, size: 3840 } },
+        ...(mode === 2
+          ? [{ binding: 1, resource: { buffer: uniform, size: 64 } }]
+          : []),
+      ],
     });
-    pass.setBindGroup(0, bg, [alignment]);
+    pass.setBindGroup(0, bg, mode === 2 ? [0, alignment] : [0]);
   }
   pass.setPipeline(pipeline);
   pass.setViewport(0, 0, 4, 4, 0, 1);

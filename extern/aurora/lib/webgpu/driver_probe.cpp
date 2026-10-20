@@ -23,10 +23,12 @@ DriverProbeResult run_driver_probe() {
   const uint32_t alignment = limits.minUniformBufferOffsetAlignment;
   const wgpu::BufferDescriptor uniformDesc{
       .usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst,
-      .size = static_cast<uint64_t>(alignment) + 64,
+      .size = static_cast<uint64_t>(alignment) + 3840,
   };
   auto uniform = g_device.CreateBuffer(&uniformDesc);
   g_queue.WriteBuffer(uniform, alignment, values.data(), sizeof(values));
+  constexpr std::array<uint32_t,4> control{42,43,44,45};
+  g_queue.WriteBuffer(uniform, 0, control.data(), sizeof(control));
   const wgpu::BufferDescriptor indexDesc{
       .usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::CopyDst, .size = 8,
   };
@@ -45,11 +47,17 @@ DriverProbeResult run_driver_probe() {
         .binding = 0, .visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment,
         .buffer = {.type = wgpu::BufferBindingType::Uniform, .hasDynamicOffset = true, .minBindingSize = 64},
     };
-    const wgpu::BindGroupLayoutDescriptor bindLayoutDesc{.entryCount = 1, .entries = &entry};
+    auto parameterEntry = entry;
+    parameterEntry.binding = 1;
+    parameterEntry.buffer.minBindingSize = 64;
+    auto controlEntry = entry;
+    controlEntry.buffer.minBindingSize = 16;
+    const std::array layoutEntries{controlEntry,parameterEntry};
+    const wgpu::BindGroupLayoutDescriptor bindLayoutDesc{.entryCount = mode == 2 ? 2u : 1u, .entries = layoutEntries.data()};
     auto bindLayout = g_device.CreateBindGroupLayout(&bindLayoutDesc);
     const wgpu::PipelineLayoutDescriptor layoutDesc{
-        .bindGroupLayoutCount = mode == 2 ? 1u : 0u,
-        .bindGroupLayouts = mode == 2 ? &bindLayout : nullptr,
+        .bindGroupLayoutCount = mode != 0 ? 1u : 0u,
+        .bindGroupLayouts = mode != 0 ? &bindLayout : nullptr,
         .immediateSize = mode == 1 ? 64u : 0u,
     };
     auto layout = g_device.CreatePipelineLayout(&layoutDesc);
@@ -94,11 +102,15 @@ DriverProbeResult run_driver_probe() {
     };
     auto pass = encoder.BeginRenderPass(&passDesc);
     if (mode == 1) pass.SetImmediates(0, values.data(), sizeof(values));
-    if (mode == 2) {
-      const wgpu::BindGroupEntry uniformEntry{.binding = 0, .buffer = uniform, .size = 64};
-      const wgpu::BindGroupDescriptor bindDesc{.layout = bindLayout, .entryCount = 1, .entries = &uniformEntry};
+    if (mode != 0) {
+      const std::array entries{
+          wgpu::BindGroupEntry{.binding = 0, .buffer = uniform, .size = 3840},
+          wgpu::BindGroupEntry{.binding = 1, .buffer = uniform, .size = 64},
+      };
+      const wgpu::BindGroupDescriptor bindDesc{.layout = bindLayout, .entryCount = mode == 2 ? 2u : 1u, .entries = entries.data()};
       auto bind = g_device.CreateBindGroup(&bindDesc);
-      pass.SetBindGroup(0, bind, 1, &alignment);
+      const std::array<uint32_t,2> offsets{0,alignment};
+      pass.SetBindGroup(0, bind, mode == 2 ? 2u : 1u, offsets.data());
     }
     pass.SetPipeline(pipeline);
     pass.SetViewport(0,0,4,4,0,1);
