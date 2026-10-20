@@ -11,6 +11,7 @@ struct DrawData {
   gfx::Range idxRange;
   gfx::Range uniformRange;
   DrawImmediateData immediateData;
+  gfx::Range immediateRange;
   uint32_t vtxCount;
   uint32_t indexCount;
   uint32_t instanceCount;

@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include "driver_probe.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -42,6 +43,7 @@ void clear_offscreen_cache();
 namespace aurora::webgpu {
 static Module Log("aurora::gpu");
 
+bool g_uniformDrawParameters = false;
 wgpu::Device g_device;
 wgpu::Queue g_queue;
 wgpu::Surface g_surface;
@@ -1089,6 +1091,25 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
     g_device.SetLoggingCallback(wgpu_log);
   }
   g_queue = g_device.GetQueue();
+  g_uniformDrawParameters = false;
+  bool useDepth24 = false;
+#ifdef __ANDROID__
+  if (g_backendType == wgpu::BackendType::OpenGLES) {
+    const auto probe = run_driver_probe();
+    Log.info("Driver probe: completed={} solid={} immediate64={} uniform64={} depth32={} depth24={} indexed={}",
+             probe.completed, probe.solid, probe.immediate, probe.uniform, probe.depth32, probe.depth24, probe.indexed);
+    constexpr std::array names{"solid", "immediate64", "uniform64", "depth32", "depth24", "indexed"};
+    for (size_t i = 0; i < names.size(); ++i) {
+      const auto& p = probe.pixels[i];
+      Log.info("Driver sample: test={} rgba={},{},{},{}", names[i], p[0], p[1], p[2], p[3]);
+    }
+    g_uniformDrawParameters = probe.uniform;
+    useDepth24 = !probe.depth32 && probe.depth24;
+    Log.info("GX draw parameters: {}; depth={}",
+             g_uniformDrawParameters ? "uniform buffer" : "immediates",
+             useDepth24 ? "Depth24Plus" : "Depth32Float");
+  }
+#endif
 
   const wgpu::Status status = g_surface.GetCapabilities(g_adapter, &g_surfaceCapabilities);
   if (status != wgpu::Status::Success) {
@@ -1118,7 +1139,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
               .height = size.native_fb_height,
               .presentMode = presentMode,
           },
-      .depthFormat = wgpu::TextureFormat::Depth32Float,
+      .depthFormat = useDepth24 ? wgpu::TextureFormat::Depth24Plus : wgpu::TextureFormat::Depth32Float,
       .msaaSamples = g_config.msaa,
       .textureAnisotropy = g_config.maxTextureAnisotropy,
   };

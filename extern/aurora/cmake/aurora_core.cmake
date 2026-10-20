@@ -82,6 +82,7 @@ if (AURORA_ENABLE_GX)
     target_compile_definitions(aurora_core PUBLIC AURORA_ENABLE_GX WEBGPU_DAWN)
     target_sources(aurora_core PRIVATE
             lib/webgpu/gpu.cpp
+            lib/webgpu/driver_probe.cpp
             lib/webgpu/gpu_cache.cpp
             lib/webgpu/gpu_prof.cpp
             lib/dawn/BackendBinding.cpp

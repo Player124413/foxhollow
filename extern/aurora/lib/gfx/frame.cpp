@@ -561,7 +561,7 @@ void initialize() {
   }
 
   {
-    constexpr std::array layoutEntries{
+    std::vector<wgpu::BindGroupLayoutEntry> layoutEntries{
         // Uniform buffer (dynamic offset)
         wgpu::BindGroupLayoutEntry{
             .binding = 0,
@@ -573,19 +573,28 @@ void initialize() {
                 },
         },
     };
+    if (webgpu::g_uniformDrawParameters) {
+      auto entry = layoutEntries[0];
+      entry.binding = 1;
+      entry.buffer.minBindingSize = sizeof(gx::DrawImmediateData);
+      layoutEntries.push_back(entry);
+    }
     const wgpu::BindGroupLayoutDescriptor layoutDesc{
         .label = "Uniform bind group layout",
         .entryCount = layoutEntries.size(),
         .entries = layoutEntries.data(),
     };
     g_resources.uniformBindGroupLayout = g_device.CreateBindGroupLayout(&layoutDesc);
-    const std::array entries{
+    std::vector<wgpu::BindGroupEntry> entries{
         wgpu::BindGroupEntry{
             .binding = 0,
             .buffer = g_resources.uniformBuffer,
             .size = gx::MaxUniformSize,
         },
     };
+    if (webgpu::g_uniformDrawParameters) {
+      entries.push_back({.binding = 1, .buffer = g_resources.uniformBuffer, .size = sizeof(gx::DrawImmediateData)});
+    }
     const wgpu::BindGroupDescriptor bindGroupDescriptor{
         .label = "Uniform bind group",
         .layout = g_resources.uniformBindGroupLayout,

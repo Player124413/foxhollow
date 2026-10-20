@@ -22,6 +22,7 @@ console.log(
 const textureFetch =
   (process.argv[4] || process.env.FOXHOLLOW_VERTEX_PATH || "texture") !==
   "storage";
+const uniformParameters = process.env.FOXHOLLOW_DRAW_PARAMETERS === "uniform";
 const d = await a.requestDevice({
   requiredLimits: {
     maxImmediateSize: 64,
@@ -51,6 +52,7 @@ const indexStage = uniformStage + bufferSize("UniformBufferSize");
 const storageStage = indexStage + bufferSize("IndexBufferSize");
 const stageSize = storageStage + bufferSize("StorageBufferSize");
 const run = async (format, base, indexed) => {
+  const arrayBase = 8190 + (base & 15);
   const positionSize = format === "f32" ? 12 : 6;
   const positionSource = indexed ? "abuf" : "vbuf";
   const positionOffset = indexed
@@ -84,7 +86,7 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
  out.color=select(vec4f(1.0,0.0,0.0,1.0),fetch_rgba8(vbuf,${colorOffset},false),all(shorts==vec2u(4660u,43981u)));
  return out;
 }
-@fragment fn fs_main(in:VertexOutput)->@location(0) vec4f{return in.color;}
+@fragment fn fs_main(in:VertexOutput)->@location(0) vec4f{return select(vec4f(1.0,0.0,0.0,1.0),in.color,imm.current_pnmtx==9u && imm.array_start0.x==${arrayBase}u);}
 `,
   };
   if (!textureFetch) {
@@ -100,6 +102,11 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
       .replaceAll("vbuf,", "&vbuf,")
       .replaceAll("abuf,", "&abuf,");
   }
+  if (uniformParameters)
+    shaderDescriptor.code = shaderDescriptor.code.replace(
+      "var<immediate> imm:Immediate;",
+      "@group(1) @binding(1) var<uniform> imm:Immediate;",
+    );
   const shader = d.createShaderModule(shaderDescriptor);
   assert.deepEqual((await shader.getCompilationInfo()).messages, []);
   const bgl0 = d.createBindGroupLayout({
@@ -118,11 +125,24 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform", hasDynamicOffset: true },
       },
+      ...(uniformParameters
+        ? [
+            {
+              binding: 1,
+              visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+              buffer: {
+                type: "uniform",
+                hasDynamicOffset: true,
+                minBindingSize: 64,
+              },
+            },
+          ]
+        : []),
     ],
   });
   const layout = d.createPipelineLayout({
     bindGroupLayouts: [bgl0, bgl1],
-    immediateSize: 64,
+    immediateSize: uniformParameters ? 0 : 64,
   });
   const p = d.createRenderPipeline({
     layout,
@@ -151,7 +171,6 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
     dv = new DataView(vertices);
   const arrays = new ArrayBuffer(16384),
     av = new DataView(arrays);
-  const arrayBase = 8190 + (base & 15);
   positions.forEach((pos, i) => {
     const offset = base + i * (indexed ? 10 : positionSize + 8);
     const data = indexed ? av : dv;
@@ -172,7 +191,16 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
     usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   });
   const uniformOffset = d.limits.minUniformBufferOffsetAlignment;
-  const uniformData = new Float32Array((3840 + uniformOffset) / 4);
+  const parameterOffset = uniformOffset + 3840;
+  const uniformData = new Float32Array(
+    (3840 + uniformOffset + (uniformParameters ? 64 : 0)) / 4,
+  );
+  const imm = new Uint32Array(16);
+  imm[0] = base;
+  imm[1] = 9;
+  imm[4] = arrayBase;
+  if (uniformParameters)
+    new Uint32Array(uniformData.buffer, parameterOffset, 16).set(imm);
   const uniforms = new Float32Array(uniformData.buffer, uniformOffset);
   uniforms.set([640, 360, 640, 480]);
   uniforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1], 4);
@@ -207,7 +235,12 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
   });
   const bg1 = d.createBindGroup({
     layout: bgl1,
-    entries: [{ binding: 0, resource: { buffer: uniformBuffer, size: 3840 } }],
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer, size: 3840 } },
+      ...(uniformParameters
+        ? [{ binding: 1, resource: { buffer: uniformBuffer, size: 64 } }]
+        : []),
+    ],
   });
   const dst = d.createTexture({
     size: [64, 64, 1],
@@ -264,7 +297,7 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
     uniformStage,
     uniformBuffer,
     0,
-    3840 + uniformOffset,
+    uniformData.byteLength,
   );
   enc.copyBufferToBuffer(stage, indexStage + 64, indexBuffer, 64, 12);
   const pass = enc.beginRenderPass({
@@ -284,12 +317,12 @@ struct VertexOutput {@builtin(position) pos:vec4f,@location(0) color:vec4f};
     },
   });
   pass.setBindGroup(0, bg0);
-  pass.setBindGroup(1, bg1, [uniformOffset]);
-  const imm = new Uint32Array(16);
-  imm[0] = base;
-  imm[1] = 9;
-  imm[4] = arrayBase;
-  pass.setImmediates(0, imm);
+  pass.setBindGroup(
+    1,
+    bg1,
+    uniformParameters ? [uniformOffset, parameterOffset] : [uniformOffset],
+  );
+  if (!uniformParameters) pass.setImmediates(0, imm);
   pass.setPipeline(p);
   pass.setViewport(0, 0, 64, 64, 0, 1);
   pass.setScissorRect(0, 0, 64, 64);

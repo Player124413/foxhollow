@@ -63,9 +63,14 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
     return;
   }
   const auto& resources = gfx::detail::resources();
-  pass.SetImmediates(0, &data.immediateData, sizeof(data.immediateData));
-  const std::array offsets{data.uniformRange.offset};
-  pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
+  if (webgpu::g_uniformDrawParameters) {
+    const std::array offsets{data.uniformRange.offset, data.immediateRange.offset};
+    pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
+  } else {
+    pass.SetImmediates(0, &data.immediateData, sizeof(data.immediateData));
+    const std::array offsets{data.uniformRange.offset};
+    pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
+  }
   if (data.bindGroups.textureBindGroup) {
     gfx::bind_texture_group(data.bindGroups.textureBindGroup, pass);
   }

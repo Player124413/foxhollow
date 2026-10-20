@@ -465,6 +465,7 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
       .idxRange = idxRange,
       .uniformRange = cache.uniformRange,
       .immediateData = immediates,
+      .immediateRange = webgpu::g_uniformDrawParameters ? gfx::push_uniform(immediates) : gfx::Range{},
       .vtxCount = vtxCount,
       .indexCount = numIndices,
       .instanceCount = instanceCount,

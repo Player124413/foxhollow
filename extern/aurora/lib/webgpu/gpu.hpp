@@ -42,6 +42,7 @@ struct Viewport {
   bool operator!=(const Viewport& rhs) const { return !(*this == rhs); }
 };
 
+extern bool g_uniformDrawParameters;
 extern wgpu::Device g_device;
 extern wgpu::Queue g_queue;
 extern wgpu::Surface g_surface;

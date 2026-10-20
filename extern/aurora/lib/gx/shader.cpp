@@ -1926,6 +1926,12 @@ fn fs_main(in: VertexOutput) -> {10} {{{6}{5}{11}
   if (webgpu::g_textureVertexFetch) {
     use_texture_vertex_fetch(shaderSource);
   }
+  if (webgpu::g_uniformDrawParameters) {
+    const std::string_view from = "var<immediate> imm: Immediate;";
+    const auto pos = shaderSource.find(from);
+    AURORA_ASSERT(pos != std::string::npos, "Missing GX draw parameter declaration");
+    shaderSource.replace(pos, from.size(), "@group(1) @binding(1) var<uniform> imm: Immediate;");
+  }
   if (dstAlphaMode == DstAlphaMode::DualSource) {
     shaderSource.insert(0, "enable dual_source_blending;\n");
   }

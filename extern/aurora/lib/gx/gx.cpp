@@ -624,7 +624,7 @@ void initialize() noexcept {
         .label = "GX Pipeline Layout",
         .bindGroupLayoutCount = layouts.size(),
         .bindGroupLayouts = layouts.data(),
-        .immediateSize = sizeof(DrawImmediateData),
+        .immediateSize = webgpu::g_uniformDrawParameters ? 0u : static_cast<uint32_t>(sizeof(DrawImmediateData)),
     };
     sPipelineLayout = g_device.CreatePipelineLayout(&desc);
   }

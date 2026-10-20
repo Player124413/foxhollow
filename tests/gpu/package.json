@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "test": "node vertex_upload.mjs ../../build-input-tests/vertex-fetch.wgsl opengles",
-    "test:storage": "node vertex_upload.mjs ../../build-input-tests/vertex-fetch.wgsl.storage.wgsl opengles storage"
+    "test:storage": "node vertex_upload.mjs ../../build-input-tests/vertex-fetch.wgsl.storage.wgsl opengles storage",
+    "test:driver": "node driver_probe.mjs ../../build-input-tests",
+    "test:uniform": "FOXHOLLOW_DRAW_PARAMETERS=uniform node vertex_upload.mjs ../../build-input-tests/vertex-fetch.wgsl opengles",
+    "test:storage-uniform": "FOXHOLLOW_DRAW_PARAMETERS=uniform node vertex_upload.mjs ../../build-input-tests/vertex-fetch.wgsl.storage.wgsl opengles storage"
   },
   "devDependencies": {
     "webgpu": "0.6.2"
