@@ -29,6 +29,28 @@ public final class LogFilesTest {
         }
     }
 
+    @Test public void nativeSummaryPreservesDriverAndRecentFrames() throws Exception {
+        File directory = Files.createTempDirectory("foxhollow-native-summary").toFile();
+        File file = new File(directory, "native.log");
+        try {
+            StringBuilder text = new StringBuilder("Driver occlusion: supported=false visible=0 clipped=0\n");
+            for (int i = 0; i < 2000; ++i) text.append("GX data: buffer=uniform repeated-matrix-data\n");
+            text.append("Frame probe: frame=900 nonblack=0/230400\n");
+            Files.write(file.toPath(), text.toString().getBytes(StandardCharsets.UTF_8));
+            String summary = LogFiles.nativeSummary(file, 24576);
+            assertTrue(summary.startsWith("Driver occlusion:"));
+            assertTrue(summary.endsWith("Frame probe: frame=900 nonblack=0/230400\n"));
+            assertTrue(summary.length() <= 24576);
+            String concise = LogFiles.conciseReport(directory, "HEADER");
+            assertTrue(concise.contains("supported=false"));
+            assertTrue(concise.contains("nonblack=0/230400"));
+            assertTrue(concise.length() < LogFiles.COPY_LIMIT);
+        } finally {
+            file.delete();
+            directory.delete();
+        }
+    }
+
     @Test public void rotationAndRetention() throws Exception {
         File directory = Files.createTempDirectory("foxhollow-logs").toFile();
         File log = new File(directory, "game.log");

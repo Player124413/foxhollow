@@ -48,6 +48,23 @@ final class LogFiles {
         }
     }
 
+    static String nativeSummary(File file, int maximum) throws IOException {
+        if (file.length() <= maximum) return tail(file, maximum);
+        String first;
+        try (RandomAccessFile input = new RandomAccessFile(file, "r")) {
+            byte[] bytes = new byte[Math.min(6144, maximum / 2)];
+            input.readFully(bytes);
+            first = new String(bytes, StandardCharsets.UTF_8);
+            int newline = first.lastIndexOf('\n');
+            first = newline >= 0 ? first.substring(0, newline + 1) : "";
+        }
+        String marker = "\n...\n";
+        String last = tail(file, maximum - first.length() - marker.length());
+        int newline = last.indexOf('\n');
+        if (newline >= 0) last = last.substring(newline + 1);
+        return first + marker + last;
+    }
+
     static String report(File directory, String header) {
         StringBuilder report = new StringBuilder(header);
         for (String name : SOURCES) {
@@ -65,13 +82,14 @@ final class LogFiles {
     static String conciseReport(File directory, String header) {
         StringBuilder report = new StringBuilder(header);
         String[] files = {"game-events.log", "exit-info.log", "native.log", "game.log", "native.log.prev"};
-        int[] sizes = {4096, 12288, 16384, 12288, 8192};
+        int[] sizes = {4096, 8192, 24576, 8192, 4096};
         for (int i = 0; i < files.length; ++i) {
             File file = new File(directory, files[i]);
             if (!file.isFile()) continue;
             report.append("\n\n=== ").append(files[i]).append(" ===\n");
             try {
-                String text = tail(file, files[i].equals("game.log") ? FILE_LIMIT : sizes[i]);
+                String text = files[i].equals("native.log") ? nativeSummary(file, sizes[i])
+                        : tail(file, files[i].equals("game.log") ? FILE_LIMIT : sizes[i]);
                 if (files[i].equals("game.log")) {
                     text = text.replaceAll("(?m)^.*\\s[VD]\\s+(?:MiuiMultiWindowUtils|VRI\\[[^\\]]*\\]|FramePredict|ScrollIdentify|ScrollerOptimizationManager)\\s*:.*(?:\\r?\\n|$)", "");
                     if (text.length() > sizes[i]) text = text.substring(text.length() - sizes[i]);

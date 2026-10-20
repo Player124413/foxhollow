@@ -153,7 +153,7 @@ void execute_encoder_task(wgpu::CommandEncoder& cmd, FramePacket& frame, const E
 }
 
 void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, RenderPass& passInfo,
-                 std::vector<RasterProbe>* probes = nullptr) {
+                 [[maybe_unused]] uint32_t passIndex, std::vector<RasterProbe>* probes = nullptr) {
   ZoneScoped;
   g_currentPipeline = nullptr;
   g_textureGroupCache.invalidate();
@@ -165,6 +165,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
   bool hasViewport = false;
   bool hasScissor = false;
   uint32_t gxDraw = 0;
+  [[maybe_unused]] uint32_t inspectedDraws = 0;
 
   // Bind bind group for the whole pass
   pass.SetBindGroup(0, resources().staticBindGroup);
@@ -204,6 +205,17 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
     } break;
     case CommandType::Draw: {
       auto& draw = cmd.data.draw;
+#ifdef __ANDROID__
+      if (draw.gx && (frame.frameIndex == 599 || frame.frameIndex == 899) && passIndex < 16 &&
+          inspectedDraws < 16 && (gxDraw < 4 || gxDraw % 32 == 0)) {
+        ++inspectedDraws;
+        const auto& v = currentViewport;
+        const auto& s = currentScissor;
+        Log.info("GX raster state: frame={} pass={} draw={} viewport={},{},{},{},{},{} scissor={},{},{},{} occlusion={}",
+                 frame.frameIndex+1,passIndex,gxDraw,v.left,v.top,v.width,v.height,v.znear,v.zfar,
+                 s.x,s.y,s.width,s.height,webgpu::g_rasterProbeSupported);
+      }
+#endif
       const bool query = draw.gx && probes != nullptr && probes->size() < 16 &&
                          (gxDraw < 4 || gxDraw % 32 == 0);
       if (query) {
@@ -321,7 +333,7 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
   };
 
   auto pass = cmd.BeginRenderPass(&renderPassDescriptor);
-  render_pass(pass, frame, passInfo, queries ? &probes : nullptr);
+  render_pass(pass, frame, passInfo, passIndex, queries ? &probes : nullptr);
   pass.End();
   if (queries) resolve_raster_probes(cmd, frame, queries, probes, passIndex);
 
