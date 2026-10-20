@@ -47,7 +47,8 @@ constexpr Module Log{"aurora::gfx"};
 
 #ifdef __ANDROID__
 void probe_uploaded_buffers(wgpu::CommandEncoder& encoder, FramePacket& frame) {
-  if (webgpu::g_textureVertexFetch || (frame.frameIndex != 899 && frame.frameIndex != 1199)) return;
+  if (!frame.deferEncoding || webgpu::g_textureVertexFetch ||
+      (frame.frameIndex != 899 && frame.frameIndex != 1199)) return;
   const std::array<const ByteBuffer*, 4> cpu{&frame.verts, &frame.uniforms, &frame.indices, &frame.storage};
   const auto& res = resources();
   const std::array gpu{res.vertexBuffer, res.uniformBuffer, res.indexBuffer, res.storageBuffer};
