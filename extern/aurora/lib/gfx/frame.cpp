@@ -19,6 +19,7 @@
 #include "../webgpu/gpu.hpp"
 #include "../webgpu/gpu_prof.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -43,6 +44,51 @@ using webgpu::g_queue;
 
 namespace {
 constexpr Module Log{"aurora::gfx"};
+
+#ifdef __ANDROID__
+void probe_uploaded_buffers(wgpu::CommandEncoder& encoder, FramePacket& frame) {
+  if (webgpu::g_textureVertexFetch || (frame.frameIndex != 899 && frame.frameIndex != 1199)) return;
+  const std::array<const ByteBuffer*, 4> cpu{&frame.verts, &frame.uniforms, &frame.indices, &frame.storage};
+  const auto& res = resources();
+  const std::array gpu{res.vertexBuffer, res.uniformBuffer, res.indexBuffer, res.storageBuffer};
+  std::array<std::array<uint8_t, 64>, 4> expected{};
+  std::array<uint32_t, 4> sizes{};
+  const wgpu::BufferDescriptor descriptor{
+      .label = "GX upload probe",
+      .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
+      .size = 256,
+  };
+  auto buffer = g_device.CreateBuffer(&descriptor);
+  for (size_t i = 0; i < cpu.size(); ++i) {
+    sizes[i] = static_cast<uint32_t>(std::min<size_t>(cpu[i]->size(), 64)) & ~3u;
+    if (sizes[i] == 0) continue;
+    std::memcpy(expected[i].data(), cpu[i]->data(), sizes[i]);
+    encoder.CopyBufferToBuffer(gpu[i], 0, buffer, i * 64, sizes[i]);
+  }
+  const uint32_t frameId = frame.frameIndex + 1;
+  frame.afterSubmitCallbacks.emplace_back([buffer, expected, sizes, frameId] {
+    buffer.MapAsync(wgpu::MapMode::Read, 0, 256, wgpu::CallbackMode::AllowSpontaneous,
+        [buffer, expected, sizes, frameId](wgpu::MapAsyncStatus status, wgpu::StringView) {
+          if (status != wgpu::MapAsyncStatus::Success) {
+            Log.warn("Upload probe: frame={} map_status={}", frameId, magic_enum::enum_name(status));
+            return;
+          }
+          const auto* data = static_cast<const uint8_t*>(buffer.GetConstMappedRange(0, 256));
+          constexpr std::array names{"vertex", "uniform", "index", "storage"};
+          for (size_t i = 0; i < sizes.size(); ++i) {
+            if (sizes[i] == 0) continue;
+            uint32_t firstBad = 0;
+            while (firstBad < sizes[i] && expected[i][firstBad] == data[i * 64 + firstBad]) ++firstBad;
+            const bool match = firstBad == sizes[i];
+            Log.info("Upload probe: frame={} buffer={} bytes={} match={} first_bad={} cpu={} gpu={}",
+                     frameId, names[i], sizes[i], match, firstBad,
+                     match ? 0u : expected[i][firstBad], match ? 0u : data[i * 64 + firstBad]);
+          }
+          buffer.Unmap();
+        });
+  });
+}
+#endif
 
 Resources g_resources;
 bool g_queueStaging = false;
@@ -431,6 +477,9 @@ void initialize() {
     if (size <= 0) {
       return;
     }
+#ifdef __ANDROID__
+    if (!webgpu::g_textureVertexFetch) usage |= wgpu::BufferUsage::CopySrc;
+#endif
     const wgpu::BufferDescriptor descriptor{
         .label = label,
         .usage = usage,
@@ -756,6 +805,9 @@ void end_frame(EndFrameCallback callback) {
     g_mappingStates[stagingSlot].store(BufferMapState::Unmapped, std::memory_order_release);
     const auto encodeStart = PresentClock::now();
     [[maybe_unused]] const bool batched = encode_deferred_frame(packet.encoder, packet);
+#ifdef __ANDROID__
+    probe_uploaded_buffers(packet.encoder, packet);
+#endif
     [[maybe_unused]] const double encodeMs =
         std::chrono::duration<double, std::milli>(PresentClock::now() - encodeStart).count();
     [[maybe_unused]] const auto opCount = packet.ops.size();
