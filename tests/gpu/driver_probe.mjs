@@ -38,8 +38,13 @@ const color = d.createTexture({
   usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
 });
 const read = d.createBuffer({
-  size: 6144,
+  size: 6240,
   usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+});
+const queries = d.createQuerySet({ type: "occlusion", count: 12 });
+const resolved = d.createBuffer({
+  size: 256,
+  usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
 });
 for (let test = 0; test < 6; ++test) {
   const encoder = d.createCommandEncoder();
@@ -104,6 +109,7 @@ for (let test = 0; test < 6; ++test) {
       })
     : null;
   const pass = encoder.beginRenderPass({
+    occlusionQuerySet: queries,
     colorAttachments: [
       {
         view: color.createView(),
@@ -139,11 +145,19 @@ for (let test = 0; test < 6; ++test) {
   pass.setPipeline(pipeline);
   pass.setViewport(0, 0, 4, 4, 0, 1);
   pass.setScissorRect(0, 0, 4, 4);
+  pass.beginOcclusionQuery(test * 2);
   if (test === 5) {
     pass.setIndexBuffer(index, "uint16", 0, 8);
     pass.drawIndexed(3);
   } else pass.draw(3);
+  pass.endOcclusionQuery();
+  pass.beginOcclusionQuery(test * 2 + 1);
+  pass.setScissorRect(0, 0, 0, 0);
+  pass.draw(3);
+  pass.endOcclusionQuery();
   pass.end();
+  encoder.resolveQuerySet(queries, test * 2, 2, resolved, 0);
+  encoder.copyBufferToBuffer(resolved, 0, read, 6144 + test * 16, 16);
   encoder.copyTextureToBuffer(
     { texture: color },
     { buffer: read, offset: test * 1024, bytesPerRow: 256, rowsPerImage: 4 },
@@ -152,7 +166,13 @@ for (let test = 0; test < 6; ++test) {
   d.queue.submit([encoder.finish()]);
 }
 await read.mapAsync(GPUMapMode.READ);
-const data = new Uint8Array(read.getMappedRange());
+const mapped = read.getMappedRange();
+const counts = new BigUint64Array(mapped, 6144, 12);
+for (let i = 0; i < 6; ++i) {
+  assert(counts[i * 2] > 0n);
+  assert.equal(counts[i * 2 + 1], 0n);
+}
+const data = new Uint8Array(mapped);
 for (let test = 0; test < 6; ++test) {
   for (let y = 0; y < 4; ++y)
     for (let x = 0; x < 4; ++x)

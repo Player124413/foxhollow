@@ -34,6 +34,7 @@ using DrawEncoder = void (*)(void* payload, const wgpu::RenderPassEncoder& pass,
 
 struct DrawCommand {
   DrawEncoder encoder = nullptr;
+  bool gx = false;
   alignas(std::max_align_t) std::array<std::byte, InlineDrawPayloadSize> payload{};
 };
 

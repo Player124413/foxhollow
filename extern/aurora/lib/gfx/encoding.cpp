@@ -39,6 +39,49 @@ constexpr Module Log{"aurora::gfx"};
 WGPURenderPipeline g_currentPipeline = nullptr;
 StateCache<BindGroupRef> g_textureGroupCache;
 
+struct RasterProbe {
+  uint32_t draw;
+  gx::DrawData data;
+  Viewport viewport;
+  ClipRect scissor;
+};
+
+void resolve_raster_probes(wgpu::CommandEncoder& cmd, FramePacket& frame, const wgpu::QuerySet& queries,
+                           const std::vector<RasterProbe>& probes, uint32_t passIndex) {
+  if (probes.empty()) return;
+  const uint64_t bytes = probes.size() * sizeof(uint64_t);
+  const wgpu::BufferDescriptor resolveDesc{
+      .usage = wgpu::BufferUsage::QueryResolve | wgpu::BufferUsage::CopySrc, .size = 256,
+  };
+  const wgpu::BufferDescriptor readDesc{
+      .usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst, .size = bytes,
+  };
+  auto resolved = g_device.CreateBuffer(&resolveDesc);
+  auto read = g_device.CreateBuffer(&readDesc);
+  cmd.ResolveQuerySet(queries, 0, static_cast<uint32_t>(probes.size()), resolved, 0);
+  cmd.CopyBufferToBuffer(resolved, 0, read, 0, bytes);
+  const auto frameId = frame.frameIndex + 1;
+  frame.afterSubmitCallbacks.emplace_back([read, probes, bytes, frameId, passIndex] {
+    read.MapAsync(wgpu::MapMode::Read, 0, bytes, wgpu::CallbackMode::AllowSpontaneous,
+        [read, probes, bytes, frameId, passIndex](wgpu::MapAsyncStatus status, wgpu::StringView) {
+          if (status != wgpu::MapAsyncStatus::Success) {
+            Log.warn("GX raster: frame={} pass={} map_status={}", frameId, passIndex, underlying(status));
+            return;
+          }
+          const auto* samples = static_cast<const uint64_t*>(read.GetConstMappedRange(0, bytes));
+          for (size_t i = 0; i < probes.size(); ++i) {
+            const auto& p = probes[i];
+            const auto& v = p.viewport;
+            const auto& s = p.scissor;
+            Log.info("GX raster: frame={} pass={} draw={} pipeline={:x} vertices={} indices={} viewport={},{},{},{},{},{} scissor={},{},{},{} samples={}",
+                     frameId,passIndex,p.draw,p.data.pipeline,p.data.vtxCount,p.data.indexCount,
+                     v.left,v.top,v.width,v.height,v.znear,v.zfar,s.x,s.y,s.width,s.height,samples[i]);
+          }
+          read.Unmap();
+        });
+  });
+}
+
 void apply_viewport(const wgpu::RenderPassEncoder& pass, const Viewport& vp) {
   const auto depth = gx::viewport_depth(vp.znear, vp.zfar, gx::UseReversedZ);
   pass.SetViewport(vp.left, vp.top, vp.width, vp.height, depth.min, depth.max);
@@ -109,7 +152,8 @@ void execute_encoder_task(wgpu::CommandEncoder& cmd, FramePacket& frame, const E
   }
 }
 
-void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, RenderPass& passInfo) {
+void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, RenderPass& passInfo,
+                 std::vector<RasterProbe>* probes = nullptr) {
   ZoneScoped;
   g_currentPipeline = nullptr;
   g_textureGroupCache.invalidate();
@@ -120,6 +164,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
   ClipRect currentScissor{};
   bool hasViewport = false;
   bool hasScissor = false;
+  uint32_t gxDraw = 0;
 
   // Bind bind group for the whole pass
   pass.SetBindGroup(0, resources().staticBindGroup);
@@ -159,9 +204,19 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
     } break;
     case CommandType::Draw: {
       auto& draw = cmd.data.draw;
+      const bool query = draw.gx && probes != nullptr && probes->size() < 16 &&
+                         (gxDraw < 4 || gxDraw % 32 == 0);
+      if (query) {
+        gx::DrawData data{};
+        std::memcpy(&data, draw.payload.data(), sizeof(data));
+        pass.BeginOcclusionQuery(static_cast<uint32_t>(probes->size()));
+        probes->push_back({gxDraw, data, currentViewport, currentScissor});
+      }
       if (draw.encoder != nullptr) {
         draw.encoder(draw.payload.data(), pass, passInfo);
       }
+      if (query) pass.EndOcclusionQuery();
+      if (draw.gx) ++gxDraw;
     } break;
     case CommandType::CustomDraw: {
       render_custom_draw(cmd.data.customDraw, pass, passInfo);
@@ -243,17 +298,32 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
   }
   const auto label = passInfo.label.empty() ? fmt::format("Render pass {}", passIndex)
                                             : fmt::format("{} {}", passInfo.label, passIndex);
+  wgpu::QuerySet queries;
+  std::vector<RasterProbe> probes;
+#ifdef __ANDROID__
+  if ((frame.frameIndex == 599 || frame.frameIndex == 899) && passIndex < 16) {
+    const wgpu::QuerySetDescriptor queryDesc{.type = wgpu::QueryType::Occlusion, .count = 16};
+    queries = g_device.CreateQuerySet(&queryDesc);
+    const auto& c = passInfo.colorAttachments[SceneColorAttachmentIndex];
+    Log.info("GX pass: frame={} pass={} label={} size={}x{} color_load={} color_store={} clear={},{},{},{} depth_clear={} depth_load={}",
+             frame.frameIndex+1,passIndex,label,c.size.width,c.size.height,underlying(attachments[0].loadOp),
+             underlying(c.storeOp),c.clearValue.x(),c.clearValue.y(),c.clearValue.z(),c.clearValue.w(),
+             passInfo.clearDepthValue,underlying(depthStencilAttachment.depthLoadOp));
+  }
+#endif
   const wgpu::RenderPassDescriptor renderPassDescriptor{
       .label = label.c_str(),
       .colorAttachmentCount = passInfo.colorAttachmentCount,
       .colorAttachments = attachments.data(),
       .depthStencilAttachment = depthStencilAttachmentPtr,
+      .occlusionQuerySet = queries,
       .timestampWrites = webgpu::gpu_prof::pass_writes(label),
   };
 
   auto pass = cmd.BeginRenderPass(&renderPassDescriptor);
-  render_pass(pass, frame, passInfo);
+  render_pass(pass, frame, passInfo, queries ? &probes : nullptr);
   pass.End();
+  if (queries) resolve_raster_probes(cmd, frame, queries, probes, passIndex);
 
   if (passInfo.captureDepthSnapshot) {
     depth_peek::encode_frame_snapshot(cmd, passInfo.copySourceDepthView,

@@ -1,6 +1,7 @@
 #include "command_processor.hpp"
 
 #include "../gfx/depth_peek.hpp"
+#include "../gfx/frame.hpp"
 #include "../gfx/recording.hpp"
 #include "../internal.hpp"
 #include "dolphin/gd/GDGeometry.h"
@@ -458,6 +459,22 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
     instanceCount = vtxCount;
   }
   cache.lastDrawFmt = fmt;
+#ifdef __ANDROID__
+  const auto frame = gfx::current_frame();
+  static uint32_t probeFrame = UINT32_MAX;
+  static uint32_t probeDraw = 0;
+  if (frame != probeFrame) { probeFrame = frame; probeDraw = 0; }
+  if ((frame == 599 || frame == 899) && probeDraw++ < 8) {
+    const auto& c = cache.config;
+    const auto& a = c.shaderConfig.attrs[GX_VA_POS];
+    const auto& ac = c.shaderConfig.alphaCompare;
+    Log.info("GX state: frame={} pipeline={:x} stride={} position={},{},{},{},{},{},{} color={} alpha={} depth={},{},{} cull={} blend={},{},{} alpha_test={},{},{},{},{}",
+             frame + 1, cache.pipelineRef, c.shaderConfig.vtxStride, a.attrType,a.cnt,a.compType,a.offset,a.stride,a.frac,a.le,
+             c.colorUpdate,c.alphaUpdate,c.depthCompare,c.depthUpdate,underlying(c.depthFunc),underlying(c.cullMode),
+             underlying(c.blendMode),underlying(c.blendFacSrc),underlying(c.blendFacDst),
+             underlying(ac.comp0),ac.ref0,underlying(ac.op),underlying(ac.comp1),ac.ref1);
+  }
+#endif
   gfx::push_draw_command(DrawData{
       .pipeline = cache.pipelineRef,
       .bindGroups = cache.bindGroups,

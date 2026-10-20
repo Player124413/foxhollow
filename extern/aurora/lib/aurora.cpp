@@ -57,36 +57,37 @@ void probe_frame_rows(wgpu::CommandEncoder& encoder, const webgpu::TextureWithSa
   const uint32_t width = source.size.width;
   const uint32_t height = source.size.height;
   const uint32_t pitch = gfx::probe_row_pitch(width);
-  const uint64_t bytes = static_cast<uint64_t>(pitch) * 3u;
+  const uint32_t rows = std::string_view(stage) == "efb" ? height : 3u;
+  const uint64_t bytes = static_cast<uint64_t>(pitch) * rows;
   const wgpu::BufferDescriptor descriptor{
       .label = "Frame probe readback",
       .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
       .size = bytes,
   };
   auto buffer = g_device.CreateBuffer(&descriptor);
-  for (uint32_t row = 0; row < 3; ++row) {
+  for (uint32_t row = 0; row < (rows == height ? 1u : 3u); ++row) {
     const wgpu::TexelCopyTextureInfo src{
         .texture = source.texture,
-        .origin = {0, (height - 1u) * (row + 1u) / 4u, 0},
+        .origin = {0, rows == height ? 0u : (height - 1u) * (row + 1u) / 4u, 0},
     };
     const wgpu::TexelCopyBufferInfo dst{
-        .layout = {.offset = static_cast<uint64_t>(pitch) * row, .bytesPerRow = pitch, .rowsPerImage = 1},
+        .layout = {.offset = static_cast<uint64_t>(pitch) * row, .bytesPerRow = pitch, .rowsPerImage = rows == height ? height : 1u},
         .buffer = buffer,
     };
-    const wgpu::Extent3D extent{width, 1, 1};
+    const wgpu::Extent3D extent{width, rows == height ? height : 1u, 1};
     encoder.CopyTextureToBuffer(&src, &dst, &extent);
   }
-  callbacks.emplace_back([buffer, stage, frame, width, height, pitch, bytes] {
+  callbacks.emplace_back([buffer, stage, frame, width, height, pitch, bytes, rows] {
     buffer.MapAsync(wgpu::MapMode::Read, 0, bytes, wgpu::CallbackMode::AllowSpontaneous,
-        [buffer, stage, frame, width, height, pitch, bytes](wgpu::MapAsyncStatus status, wgpu::StringView) {
+        [buffer, stage, frame, width, height, pitch, bytes, rows](wgpu::MapAsyncStatus status, wgpu::StringView) {
           if (status != wgpu::MapAsyncStatus::Success) {
             Log.warn("Frame probe: frame={} stage={} map_status={}", frame, stage, magic_enum::enum_name(status));
             return;
           }
           const auto* data = static_cast<const uint8_t*>(buffer.GetConstMappedRange(0, bytes));
-          const auto stats = gfx::probe_rows(data, width, pitch);
+          const auto stats = gfx::probe_rows(data, width, pitch, rows);
           Log.info("Frame probe: frame={} stage={} size={}x{} nonblack={}/{} max_rgb={} nonopaque={}",
-                   frame, stage, width, height, stats.nonblack, width * 3u, stats.maxRgb, stats.nonopaque);
+                   frame, stage, width, height, stats.nonblack, width * rows, stats.maxRgb, stats.nonopaque);
           buffer.Unmap();
         });
   });

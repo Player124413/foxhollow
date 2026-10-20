@@ -21,4 +21,15 @@ int main() {
     stats = probe_rows(data.data(), width, pitch);
     assert(stats.nonblack == 1 && stats.maxRgb == 42 && stats.nonopaque == 1);
   }
+  const uint32_t width = 65, height = 17, pitch = probe_row_pitch(width);
+  std::vector<uint8_t> image(pitch * height, 255);
+  for (uint32_t y = 0; y < height; ++y) for (uint32_t x = 0; x < width; ++x) {
+    auto* p = image.data() + y * pitch + x * 4;
+    p[0] = p[1] = p[2] = 0;
+  }
+  image[15 * pitch + 64 * 4 + 1] = 203;
+  auto stats = probe_rows(image.data(), width, pitch, height);
+  assert(stats.nonblack == 1 && stats.maxRgb == 203 && stats.nonopaque == 0);
+  assert(probe_rows(image.data(),width,pitch).nonblack == 0);
+
 }

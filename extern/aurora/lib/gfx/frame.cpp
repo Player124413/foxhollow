@@ -52,38 +52,45 @@ void probe_uploaded_buffers(wgpu::CommandEncoder& encoder, FramePacket& frame) {
   const std::array<const ByteBuffer*, 4> cpu{&frame.verts, &frame.uniforms, &frame.indices, &frame.storage};
   const auto& res = resources();
   const std::array gpu{res.vertexBuffer, res.uniformBuffer, res.indexBuffer, res.storageBuffer};
-  std::array<std::array<uint8_t, 64>, 4> expected{};
+  std::array<std::vector<uint8_t>, 4> expected;
+  std::array<uint64_t, 4> offsets{};
   std::array<uint32_t, 4> sizes{};
+  uint64_t bytes = 0;
+  for (size_t i = 0; i < cpu.size(); ++i) {
+    sizes[i] = static_cast<uint32_t>(cpu[i]->size()) & ~3u;
+    offsets[i] = bytes;
+    bytes += sizes[i];
+    if (sizes[i] != 0) expected[i].assign(cpu[i]->data(), cpu[i]->data() + sizes[i]);
+  }
+  if (bytes == 0) return;
   const wgpu::BufferDescriptor descriptor{
       .label = "GX upload probe",
       .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
-      .size = 256,
+      .size = bytes,
   };
   auto buffer = g_device.CreateBuffer(&descriptor);
   for (size_t i = 0; i < cpu.size(); ++i) {
-    sizes[i] = static_cast<uint32_t>(std::min<size_t>(cpu[i]->size(), 64)) & ~3u;
     if (sizes[i] == 0) continue;
-    std::memcpy(expected[i].data(), cpu[i]->data(), sizes[i]);
-    encoder.CopyBufferToBuffer(gpu[i], 0, buffer, i * 64, sizes[i]);
+    encoder.CopyBufferToBuffer(gpu[i], 0, buffer, offsets[i], sizes[i]);
   }
   const uint32_t frameId = frame.frameIndex + 1;
-  frame.afterSubmitCallbacks.emplace_back([buffer, expected, sizes, frameId] {
-    buffer.MapAsync(wgpu::MapMode::Read, 0, 256, wgpu::CallbackMode::AllowSpontaneous,
-        [buffer, expected, sizes, frameId](wgpu::MapAsyncStatus status, wgpu::StringView) {
+  frame.afterSubmitCallbacks.emplace_back([buffer, expected, sizes, frameId, offsets, bytes] {
+    buffer.MapAsync(wgpu::MapMode::Read, 0, bytes, wgpu::CallbackMode::AllowSpontaneous,
+        [buffer, expected, sizes, frameId, offsets, bytes](wgpu::MapAsyncStatus status, wgpu::StringView) {
           if (status != wgpu::MapAsyncStatus::Success) {
             Log.warn("Upload probe: frame={} map_status={}", frameId, magic_enum::enum_name(status));
             return;
           }
-          const auto* data = static_cast<const uint8_t*>(buffer.GetConstMappedRange(0, 256));
+          const auto* data = static_cast<const uint8_t*>(buffer.GetConstMappedRange(0, bytes));
           constexpr std::array names{"vertex", "uniform", "index", "storage"};
           for (size_t i = 0; i < sizes.size(); ++i) {
             if (sizes[i] == 0) continue;
             uint32_t firstBad = 0;
-            while (firstBad < sizes[i] && expected[i][firstBad] == data[i * 64 + firstBad]) ++firstBad;
+            while (firstBad < sizes[i] && expected[i][firstBad] == data[offsets[i] + firstBad]) ++firstBad;
             const bool match = firstBad == sizes[i];
             Log.info("Upload probe: frame={} buffer={} bytes={} match={} first_bad={} cpu={} gpu={}",
                      frameId, names[i], sizes[i], match, firstBad,
-                     match ? 0u : expected[i][firstBad], match ? 0u : data[i * 64 + firstBad]);
+                     match ? 0u : expected[i][firstBad], match ? 0u : data[offsets[i] + firstBad]);
           }
           buffer.Unmap();
         });

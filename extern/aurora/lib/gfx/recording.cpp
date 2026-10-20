@@ -359,7 +359,7 @@ template <auto Renderer, InlinePayload T>
 DrawCommand make_draw_command(const T& data) {
   static_assert(sizeof(T) <= InlineDrawPayloadSize);
   static_assert(alignof(T) <= alignof(std::max_align_t));
-  DrawCommand command{.encoder = encode_draw<Renderer, T>};
+  DrawCommand command{.encoder = encode_draw<Renderer, T>, .gx = std::is_same_v<T, gx::DrawData>};
   std::memcpy(command.payload.data(), &data, sizeof(data));
   return command;
 }
@@ -1147,6 +1147,26 @@ bool push_encoder_task(EncoderTaskId type, const void* payload, size_t payloadSi
 
 template <>
 void push_draw_command(gx::DrawData data) {
+#ifdef __ANDROID__
+  auto& frame = current_frame_packet();
+  if ((frame.frameIndex == 599 || frame.frameIndex == 899) && g_recorder.drawCallCount < 8) {
+    const auto dump = [&](const char* name, const ByteBuffer& buffer, Range range) {
+      if (range.offset > buffer.size() || range.size > buffer.size() - range.offset) return;
+      std::string hex;
+      for (size_t i = 0; i < std::min<size_t>(range.size, 128); ++i)
+        hex += fmt::format("{:02x}", buffer.data()[range.offset + i]);
+      Log.info("GX data: frame={} draw={} buffer={} offset={} size={} hex={}",
+               frame.frameIndex + 1, g_recorder.drawCallCount, name, range.offset, range.size, hex);
+    };
+    Log.info("GX command: frame={} draw={} pipeline={:x} vertices={} indices={} instances={} pnmtx={}",
+             frame.frameIndex + 1, g_recorder.drawCallCount, data.pipeline, data.vtxCount,
+             data.indexCount, data.instanceCount, data.immediateData.currentPnMtx);
+    dump("vertex", frame.verts, data.vertRange);
+    dump("uniform", frame.uniforms, data.uniformRange);
+    dump("index", frame.indices, data.idxRange);
+    if (data.immediateRange.size) dump("parameters", frame.uniforms, data.immediateRange);
+  }
+#endif
   push_draw_command(make_draw_command<gx::render>(data));
 }
 

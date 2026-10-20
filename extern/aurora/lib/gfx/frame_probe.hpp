@@ -12,9 +12,9 @@ struct FrameProbeStats {
   uint32_t maxRgb = 0;
 };
 
-inline FrameProbeStats probe_rows(const uint8_t* bytes, uint32_t width, uint32_t pitch) {
+inline FrameProbeStats probe_rows(const uint8_t* bytes, uint32_t width, uint32_t pitch, uint32_t height = 3) {
   FrameProbeStats stats;
-  for (uint32_t row = 0; row < 3; ++row) {
+  for (uint32_t row = 0; row < height; ++row) {
     for (uint32_t x = 0; x < width; ++x) {
       const auto* pixel = bytes + static_cast<size_t>(row) * pitch + x * 4u;
       uint32_t peak = pixel[0];
