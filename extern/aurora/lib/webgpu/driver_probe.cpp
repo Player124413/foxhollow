@@ -35,8 +35,8 @@ DriverProbeResult run_driver_probe() {
   auto index = g_device.CreateBuffer(&indexDesc);
   constexpr std::array<uint16_t,4> indices{0,1,2,0};
   g_queue.WriteBuffer(index, 0, indices.data(), sizeof(indices));
-  auto encoder = g_device.CreateCommandEncoder();
   for (uint32_t test = 0; test < 6; ++test) {
+    auto encoder = g_device.CreateCommandEncoder();
     const uint32_t mode = test == 1 || test == 2 ? test : 0;
     const auto source = driver_probe_source(mode);
     wgpu::ShaderSourceWGSL wgsl{};
@@ -126,9 +126,9 @@ DriverProbeResult run_driver_probe() {
     };
     const wgpu::Extent3D extent{4,4,1};
     encoder.CopyTextureToBuffer(&src, &dst, &extent);
+    auto command = encoder.Finish();
+    g_queue.Submit(1, &command);
   }
-  auto command = encoder.Finish();
-  g_queue.Submit(1, &command);
   struct State { bool mapped = false; std::array<bool,6> passed{}; std::array<std::array<uint8_t,4>,6> pixels{}; };
   auto state = std::make_shared<State>();
   auto future = read.MapAsync(wgpu::MapMode::Read, 0, 6144, wgpu::CallbackMode::WaitAnyOnly,

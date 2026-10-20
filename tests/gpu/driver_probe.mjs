@@ -41,8 +41,8 @@ const read = d.createBuffer({
   size: 6144,
   usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
-const encoder = d.createCommandEncoder();
 for (let test = 0; test < 6; ++test) {
+  const encoder = d.createCommandEncoder();
   const mode = test === 1 || test === 2 ? test : 0;
   const code = fs.readFileSync(
     `${process.argv[2] || "build-input-tests"}/driver-probe-${mode}.wgsl`,
@@ -149,8 +149,8 @@ for (let test = 0; test < 6; ++test) {
     { buffer: read, offset: test * 1024, bytesPerRow: 256, rowsPerImage: 4 },
     [4, 4, 1],
   );
+  d.queue.submit([encoder.finish()]);
 }
-d.queue.submit([encoder.finish()]);
 await read.mapAsync(GPUMapMode.READ);
 const data = new Uint8Array(read.getMappedRange());
 for (let test = 0; test < 6; ++test) {
