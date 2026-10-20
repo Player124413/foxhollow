@@ -20,3 +20,5 @@ android/__pycache__/
 /.android-signing/
 
 tests/shaders/node_modules/
+
+tests/gpu/node_modules/

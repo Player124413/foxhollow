@@ -1,0 +1,12 @@
+{
+  "name": "foxhollow-gpu-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node vertex_upload.mjs ../../build-input-tests/vertex-fetch.wgsl opengles",
+    "test:storage": "node vertex_upload.mjs ../../build-input-tests/vertex-fetch.wgsl.storage.wgsl opengles storage"
+  },
+  "devDependencies": {
+    "webgpu": "0.6.2"
+  }
+}

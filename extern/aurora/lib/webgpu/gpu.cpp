@@ -912,15 +912,15 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
     constexpr bool compatibilityProfile = false;
 #endif
     if (compatibilityProfile) {
-      Log.info("Android OpenGLES compatibility profile: texture vertices; dual-source blending disabled");
+      Log.info("Android OpenGLES compatibility profile: capability-selected vertices; dual-source blending disabled");
     }
     g_textureVertexFetch = gfx::needs_texture_vertex_fetch(
         supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
-        supportedCompatibilityLimits.maxStorageBuffersInFragmentStage, compatibilityProfile);
+        supportedCompatibilityLimits.maxStorageBuffersInFragmentStage);
     Log.info("Vertex data path: {}; storage buffers vertex={}, fragment={}; compatibility_profile={}",
              g_textureVertexFetch ? "RGBA32Uint texture fetch" : "storage buffer fetch",
              supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
-             supportedCompatibilityLimits.maxStorageBuffersInFragmentStage, compatibilityProfile);
+             supportedCompatibilityLimits.maxStorageBuffersInFragmentStage);
     wgpu::CompatibilityModeLimits compatibilityModeLimits{wgpu::CompatibilityModeLimits::Init{
         .maxStorageBuffersInVertexStage = g_textureVertexFetch ? 0u : 2u,
         .maxStorageBuffersInFragmentStage = g_textureVertexFetch ? 0u : 1u,

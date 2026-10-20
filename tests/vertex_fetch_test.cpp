@@ -99,12 +99,10 @@ int main(int argc, char** argv) {
   assert(argc == 3);
   for (uint32_t vertex : {0u, 1u, 2u, 4u, 16u}) {
     for (uint32_t fragment : {0u, 1u, 4u, 16u}) {
-      assert(needs_texture_vertex_fetch(vertex, fragment, true));
-      assert(needs_texture_vertex_fetch(vertex, fragment, false) == (vertex < 2 || fragment < 1));
+      assert(needs_texture_vertex_fetch(vertex, fragment) == (vertex < 2 || fragment < 1));
     }
   }
-  assert(needs_texture_vertex_fetch(4, 4, true));
-  assert(!needs_texture_vertex_fetch(4, 4, false));
+  assert(!needs_texture_vertex_fetch(4, 4));
   assert(needs_texture_vertex_fetch(0, 0));
   assert(needs_texture_vertex_fetch(0, 2));
   assert(needs_texture_vertex_fetch(1, 2));
@@ -125,6 +123,13 @@ int main(int argc, char** argv) {
   auto shader = shaderFile.substr(start, end - start);
   replace_all(shader, "{{", "{");
   replace_all(shader, "}}", "}");
+  auto storageShader = shader;
+  replace_all(storageShader, "{12}", std::string(aurora::gx::vertex_load_word_source(false)));
+  replace_all(storageShader, "{13}", "");
+  replace_all(storageShader, "{14}", "");
+  replace_all(storageShader, "{15}", "");
+  replace_all(storageShader, "{16}", std::string(aurora::gx::vertex_short_pair_source(false)));
+  replace_all(storageShader, "{17}", "");
   replace_all(shader, "{12}", std::string(aurora::gx::vertex_load_word_source(true)));
   replace_all(shader, "{13}", std::string(aurora::gx::vertex_float_fast_path(true, 3)));
   replace_all(shader, "{14}", std::string(aurora::gx::vertex_float_fast_path(true, 4)));
@@ -137,7 +142,7 @@ int main(int argc, char** argv) {
   const auto firstReturn = pairBody.find("return ");
   assert(firstReturn != std::string::npos);
   assert(pairBody.find("return ", firstReturn + 1) == std::string::npos);
-  shader += R"(
+  const std::string stages = R"(
 @group(0) @binding(0) var<storage, read> vbuf: array<u32>;
 @group(0) @binding(1) var<storage, read> abuf: array<u32>;
 @vertex fn vs_main(@builtin(vertex_index) vidx: u32) -> @builtin(position) vec4f {
@@ -153,6 +158,8 @@ int main(int argc, char** argv) {
   return vec4f(bitcast<f32>(load_word(&abuf, u32(pos.x))));
 }
 )";
+  storageShader += stages;
+  shader += stages;
   aurora::gx::use_texture_vertex_fetch(shader);
   assert(shader.find("ptr<storage") == std::string::npos);
   assert(shader.find("var<storage") == std::string::npos);
@@ -176,4 +183,7 @@ int main(int argc, char** argv) {
   std::ofstream output(argv[2]);
   output << shader;
   assert(output.good());
+  std::ofstream storageOutput(std::string(argv[2]) + ".storage.wgsl");
+  storageOutput << storageShader;
+  assert(storageOutput.good());
 }
