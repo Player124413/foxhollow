@@ -920,7 +920,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
     Log.info("Vertex data path: {}; storage buffers vertex={}, fragment={}; compatibility_profile={}",
              g_textureVertexFetch ? "RGBA32Uint texture fetch" : "storage buffer fetch",
              supportedCompatibilityLimits.maxStorageBuffersInVertexStage,
-             supportedCompatibilityLimits.maxStorageBuffersInFragmentStage);
+             supportedCompatibilityLimits.maxStorageBuffersInFragmentStage, compatibilityProfile);
     wgpu::CompatibilityModeLimits compatibilityModeLimits{wgpu::CompatibilityModeLimits::Init{
         .maxStorageBuffersInVertexStage = g_textureVertexFetch ? 0u : 2u,
         .maxStorageBuffersInFragmentStage = g_textureVertexFetch ? 0u : 1u,
