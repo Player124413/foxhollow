@@ -43,6 +43,7 @@ struct Viewport {
 };
 
 extern bool g_uniformDrawParameters;
+extern bool g_rasterProbeSupported;
 extern wgpu::Device g_device;
 extern wgpu::Queue g_queue;
 extern wgpu::Surface g_surface;

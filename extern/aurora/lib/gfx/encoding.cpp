@@ -303,7 +303,7 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
 #ifdef __ANDROID__
   if ((frame.frameIndex == 599 || frame.frameIndex == 899) && passIndex < 16) {
     const wgpu::QuerySetDescriptor queryDesc{.type = wgpu::QueryType::Occlusion, .count = 16};
-    queries = g_device.CreateQuerySet(&queryDesc);
+    if (webgpu::g_rasterProbeSupported) queries = g_device.CreateQuerySet(&queryDesc);
     const auto& c = passInfo.colorAttachments[SceneColorAttachmentIndex];
     Log.info("GX pass: frame={} pass={} label={} size={}x{} color_load={} color_store={} clear={},{},{},{} depth_clear={} depth_load={}",
              frame.frameIndex+1,passIndex,label,c.size.width,c.size.height,underlying(attachments[0].loadOp),

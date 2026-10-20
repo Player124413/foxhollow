@@ -15,9 +15,15 @@ DriverProbeResult run_driver_probe() {
   auto color = g_device.CreateTexture(&colorDesc);
   auto colorView = color.CreateView();
   const wgpu::BufferDescriptor readDesc{
-      .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead, .size = 6144,
+      .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead, .size = 6160,
   };
   auto read = g_device.CreateBuffer(&readDesc);
+  const wgpu::QuerySetDescriptor queryDesc{.type = wgpu::QueryType::Occlusion, .count = 2};
+  auto queries = g_device.CreateQuerySet(&queryDesc);
+  const wgpu::BufferDescriptor queryBufferDesc{
+      .usage = wgpu::BufferUsage::QueryResolve | wgpu::BufferUsage::CopySrc, .size = 256,
+  };
+  auto queryBuffer = g_device.CreateBuffer(&queryBufferDesc);
   wgpu::Limits limits{};
   g_device.GetLimits(&limits);
   const uint32_t alignment = limits.minUniformBufferOffsetAlignment;
@@ -99,6 +105,7 @@ DriverProbeResult run_driver_probe() {
     const wgpu::RenderPassDescriptor passDesc{
         .colorAttachmentCount = 1, .colorAttachments = &attachment,
         .depthStencilAttachment = hasDepth ? &depthAttachment : nullptr,
+        .occlusionQuerySet = test == 0 ? queries : nullptr,
     };
     auto pass = encoder.BeginRenderPass(&passDesc);
     if (mode == 1) pass.SetImmediates(0, values.data(), sizeof(values));
@@ -115,11 +122,23 @@ DriverProbeResult run_driver_probe() {
     pass.SetPipeline(pipeline);
     pass.SetViewport(0,0,4,4,0,1);
     pass.SetScissorRect(0,0,4,4);
+    if (test == 0) pass.BeginOcclusionQuery(0);
     if (test == 5) {
       pass.SetIndexBuffer(index, wgpu::IndexFormat::Uint16, 0, 8);
       pass.DrawIndexed(3);
     } else pass.Draw(3);
+    if (test == 0) {
+      pass.EndOcclusionQuery();
+      pass.SetScissorRect(0,0,0,0);
+      pass.BeginOcclusionQuery(1);
+      pass.Draw(3);
+      pass.EndOcclusionQuery();
+    }
     pass.End();
+    if (test == 0) {
+      encoder.ResolveQuerySet(queries,0,2,queryBuffer,0);
+      encoder.CopyBufferToBuffer(queryBuffer,0,read,6144,16);
+    }
     const wgpu::TexelCopyTextureInfo src{.texture = color};
     const wgpu::TexelCopyBufferInfo dst{
         .layout = {.offset = test * 1024u, .bytesPerRow = 256, .rowsPerImage = 4}, .buffer = read,
@@ -129,12 +148,12 @@ DriverProbeResult run_driver_probe() {
     auto command = encoder.Finish();
     g_queue.Submit(1, &command);
   }
-  struct State { bool mapped = false; std::array<bool,6> passed{}; std::array<std::array<uint8_t,4>,6> pixels{}; };
+  struct State { bool mapped = false; std::array<bool,6> passed{}; std::array<std::array<uint8_t,4>,6> pixels{}; uint64_t visible = 0, clipped = 0; };
   auto state = std::make_shared<State>();
-  auto future = read.MapAsync(wgpu::MapMode::Read, 0, 6144, wgpu::CallbackMode::WaitAnyOnly,
+  auto future = read.MapAsync(wgpu::MapMode::Read, 0, 6160, wgpu::CallbackMode::WaitAnyOnly,
       [read, state](wgpu::MapAsyncStatus status, wgpu::StringView) {
         if (status != wgpu::MapAsyncStatus::Success) return;
-        const auto* data = static_cast<const uint8_t*>(read.GetConstMappedRange(0,6144));
+        const auto* data = static_cast<const uint8_t*>(read.GetConstMappedRange(0,6160));
         for (uint32_t test = 0; test < 6; ++test) {
           for (uint32_t c = 0; c < 4; ++c) state->pixels[test][c] = data[test * 1024 + c];
           bool valid = true;
@@ -144,10 +163,13 @@ DriverProbeResult run_driver_probe() {
           }
           state->passed[test] = valid;
         }
+        const auto* counts = reinterpret_cast<const uint64_t*>(data + 6144);
+        state->visible = counts[0];
+        state->clipped = counts[1];
         state->mapped = true;
         read.Unmap();
       });
   if (g_instance.WaitAny(future, 5000000000) != wgpu::WaitStatus::Success || !state->mapped) return {};
-  return {state->passed[0],state->passed[1],state->passed[2],state->passed[3],state->passed[4],state->passed[5],true,state->pixels};
+  return {state->passed[0],state->passed[1],state->passed[2],state->passed[3],state->passed[4],state->passed[5],true,state->pixels,state->visible,state->clipped};
 }
 }

@@ -44,6 +44,7 @@ namespace aurora::webgpu {
 static Module Log("aurora::gpu");
 
 bool g_uniformDrawParameters = false;
+bool g_rasterProbeSupported = false;
 wgpu::Device g_device;
 wgpu::Queue g_queue;
 wgpu::Surface g_surface;
@@ -1092,6 +1093,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
   }
   g_queue = g_device.GetQueue();
   g_uniformDrawParameters = false;
+  g_rasterProbeSupported = false;
   bool useDepth24 = false;
 #ifdef __ANDROID__
   if (g_backendType == wgpu::BackendType::OpenGLES) {
@@ -1103,6 +1105,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
       const auto& p = probe.pixels[i];
       Log.info("Driver sample: test={} rgba={},{},{},{}", names[i], p[0], p[1], p[2], p[3]);
     }
+    g_rasterProbeSupported = probe.completed && probe.visibleSamples > 0 && probe.clippedSamples == 0;
+    Log.info("Driver occlusion: supported={} visible={} clipped={}",
+             g_rasterProbeSupported, probe.visibleSamples, probe.clippedSamples);
     g_uniformDrawParameters = probe.uniform;
     useDepth24 = !probe.depth32 && probe.depth24;
     Log.info("GX draw parameters: {}; depth={}",

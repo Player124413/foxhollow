@@ -58,6 +58,8 @@ struct DriverProbeResult {
   bool indexed = false;
   bool completed = false;
   std::array<std::array<uint8_t,4>,6> pixels{};
+  uint64_t visibleSamples = 0;
+  uint64_t clippedSamples = 0;
 };
 DriverProbeResult run_driver_probe();
 }
